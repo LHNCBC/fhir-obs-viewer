@@ -14,6 +14,7 @@ const {
   generateDefinitionsCsv,
   applyScrubberSetting,
   buildSettingsUpdateObj,
+  buildServerDescription,
   setCustomizationDefinitionsFile
 } = require('./autoconfig');
 const { parseCsvString, stringifyCsvRows } = require('./definitions-generator');
@@ -230,6 +231,40 @@ test('buildSettingsUpdateObj keeps customization keys and sets defaultServer',
     );
     assert.equal(updateObj.auth, undefined);
   });
+
+
+test('buildServerDescription caps generated maxHasAllowed at one', () => {
+  const features = {
+    batch: true,
+    maxHasAllowed: 2
+  };
+  const fhirClient = {
+    getVersionName() {
+      return 'R4';
+    },
+    getFeatures() {
+      return features;
+    }
+  };
+
+  const originalConsoleLog = console.log;
+  const messages = [];
+  console.log = (message) => messages.push(message);
+
+  try {
+    const serverDescription = buildServerDescription(fhirClient);
+
+    assert.equal(serverDescription.version, 'R4');
+    assert.equal(serverDescription.features.batch, true);
+    assert.equal(serverDescription.features.maxHasAllowed, 1);
+    assert.equal(features.maxHasAllowed, 1);
+    assert.deepEqual(messages, [
+      'Capping maxHasAllowed from 2 to 1 to avoid high server load.'
+    ]);
+  } finally {
+    console.log = originalConsoleLog;
+  }
+});
 
 
 test('setCustomizationDefinitionsFile writes definitionsFile under the server ' +
@@ -902,5 +937,3 @@ test('FhirBatchQuery logs HTTP status for node-side requests', async () => {
     console.log = originalLog;
   }
 });
-
-

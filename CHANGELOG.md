@@ -3,6 +3,12 @@
 This log documents the significant changes for each release.
 This project follows [Semantic Versioning](http://semver.org/).
 
+## [7.9.4] - 2026-05-18
+### Fixed
+- Autoconfig-generated server descriptions now cap `maxHasAllowed` at 1 to
+  avoid expensive queries that combine multiple `_has` parameters with
+  `_summary` against HAPI servers.
+
 ## [7.9.3] - 2026-05-01
 ### Fixed
 - Fixed the incorrect input field size for autocomplete when the list of
