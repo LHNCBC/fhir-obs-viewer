@@ -249,7 +249,7 @@ test('buildServerDescription caps generated maxHasAllowed at one', () => {
 
   const originalConsoleLog = console.log;
   const messages = [];
-  console.log = (message) => messages.push(message);
+  console.warn = (message) => messages.push(message);
 
   try {
     const serverDescription = buildServerDescription(fhirClient);
