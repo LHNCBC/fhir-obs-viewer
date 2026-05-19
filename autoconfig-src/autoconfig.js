@@ -348,7 +348,7 @@ function buildServerDescription(fhirClient) {
   //  uncontrolled increase in load on the HAPI server:
   //  simply disallow the use of more than one `_has` parameter.
   if (features.maxHasAllowed > 1) {
-    console.log(
+    console.warn(
       `Capping maxHasAllowed from ${features.maxHasAllowed} to 1 to avoid ` +
       'high server load.'
     );
