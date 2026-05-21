@@ -337,6 +337,31 @@ function buildSettingsUpdateObj(settings, url) {
 
 
 /**
+ * Builds the server description stored in generated settings output.
+ * @param {FhirBatchQuery} fhirClient - Initialized FHIR client.
+ * @returns {{version: string, features: object}} Server description settings.
+ */
+function buildServerDescription(fhirClient) {
+  const features = fhirClient.getFeatures();
+  // TODO: Temporary workaround for the issue where combining two "_has"
+  //  parameters together with a `_summary` parameter leads to an
+  //  uncontrolled increase in load on the HAPI server:
+  //  simply disallow the use of more than one `_has` parameter.
+  if (features.maxHasAllowed > 1) {
+    console.warn(
+      `Capping maxHasAllowed from ${features.maxHasAllowed} to 1 to avoid ` +
+      'high server load.'
+    );
+    features.maxHasAllowed = 1;
+  }
+  return {
+    version: fhirClient.getVersionName(),
+    features
+  };
+}
+
+
+/**
  * Sets server-specific definitions file in the customization section.
  * @param {object} updateSettingsObj - Mutable settings update payload.
  * @param {string} url - FHIR server URL key inside `customization`.
@@ -555,10 +580,8 @@ program.command('init')
     // application, and use the results to update settings.
     try {
       await fhirClient.initialize();
-      updateSettingsObj.default['serverDescription'] = {
-        version: fhirClient.getVersionName(),
-        features: fhirClient.getFeatures()
-      };
+      updateSettingsObj.default['serverDescription'] =
+        buildServerDescription(fhirClient);
 
       const csvOutputPath = path.join(options.output, 'csv');
       if (!fs.existsSync(csvOutputPath)) {
@@ -618,5 +641,6 @@ module.exports = {
   generateDefinitionsCsv,
   applyScrubberSetting,
   buildSettingsUpdateObj,
+  buildServerDescription,
   setCustomizationDefinitionsFile
 };
