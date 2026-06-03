@@ -33,7 +33,7 @@ import {
   CreateCohortMode
 } from '../../shared/cohort/cohort.service';
 import { PullDataService } from '../../shared/pull-data/pull-data.service';
-import pkg from '../../../../package.json';
+import { APP_VERSION } from '../../shared/app-version';
 import { findLast } from 'lodash-es';
 import { getUrlParam } from '../../shared/utils';
 import {
@@ -442,7 +442,7 @@ export class StepperComponent implements OnInit, AfterViewInit, OnDestroy {
   getSavedObject(): any {
     const scrubberID = this.fhirBackend.fhirClient.getScrubberIDHeader();
     const result: any = {
-      version: pkg.version,
+      version: APP_VERSION,
       ...(scrubberID ? {scrubberID} : {}),
       serviceBaseUrl: this.fhirBackend.serviceBaseUrl,
       isCartCriteria: !!this.selectRecordsComponent,

@@ -519,17 +519,14 @@ function getSearchParametersConfig(
   return resultConfig;
 }
 
-module.exports = function loader(source) {
-  const index = JSON.parse(source);
-  const options = this.getOptions();
-
+function buildDefinitionsIndex(index, options, contextPath) {
   index.configByVersionName = Object.values(
     index.versionNameByVersionNumberRegex
   ).reduce((acc, versionName) => {
     const { resourceTypes, additionalExpressions } = options[versionName];
     if (!acc[versionName]) {
       acc[versionName] = getSearchParametersConfig(
-        this.context + '/' + versionName,
+        contextPath + '/' + versionName,
         resourceTypes,
         additionalExpressions
       );
@@ -537,5 +534,17 @@ module.exports = function loader(source) {
     return acc;
   }, {});
 
-  return JSON.stringify(index);
-};
+  return index;
+}
+
+function loader(source) {
+  const index = JSON.parse(source);
+  const options =
+    (typeof this.getOptions === 'function' ? this.getOptions() : this.query) ||
+    {};
+  return JSON.stringify(buildDefinitionsIndex(index, options, this.context));
+}
+
+module.exports = loader;
+module.exports.buildDefinitionsIndex = buildDefinitionsIndex;
+module.exports.getSearchParametersConfig = getSearchParametersConfig;
