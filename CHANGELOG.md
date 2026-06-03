@@ -3,6 +3,18 @@
 This log documents the significant changes for each release.
 This project follows [Semantic Versioning](http://semver.org/).
 
+## [7.9.5] - 2026-06-02
+### Changed
+- Replaced TSLint with Angular ESLint, added linting to the full `npm test`
+  workflow, and updated Cypress test plugin configuration for ES module imports.
+- Renamed the Angular spec TypeScript config to `src/tsconfig.json` and updated
+  the unit-test target to use it.
+- Removed unused imports and test helpers surfaced by the new lint rules.
+
+### Fixed
+- Cohort searches now skip resources without Patient IDs before Patient lookups
+  and criteria checks, avoiding malformed Patient and subject queries.
+
 ## [7.9.4] - 2026-05-18
 ### Fixed
 - Autoconfig-generated server descriptions now cap `maxHasAllowed` at 1 to

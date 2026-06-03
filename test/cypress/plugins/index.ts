@@ -1,11 +1,10 @@
 // Plugins enable you to tap into, modify, or extend the internal behavior of Cypress
 // For more info, visit https://on.cypress.io/plugins-api
 import * as fs from 'fs';
+import * as webpackPreprocessor from '@cypress/webpack-preprocessor';
+import webpackConfig from '../cypress.webpack.config.js';
 
-const webpackPreprocessor = require('@cypress/webpack-preprocessor');
-const webpackConfig = require('../cypress.webpack.config');
-
-module.exports = (on, config) => {
+export default function (on, config) {
   on('task', {
     removeCohortFileIfExist(): null {
       const cohortFile = `${config.downloadsFolder}/cohort-100.json`;

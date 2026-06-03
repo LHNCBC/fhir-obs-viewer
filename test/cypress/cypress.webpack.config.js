@@ -1,9 +1,11 @@
 // From https://github.com/cypress-io/cypress/issues/19066#issuecomment-1001308186
-const path = require('path');
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const tsConfigFile = path.resolve(__dirname, './tsconfig.json');
 
-module.exports = {
+export default {
   resolve: {
     extensions: ['.ts', '.js', '.mjs', '.json']
   },

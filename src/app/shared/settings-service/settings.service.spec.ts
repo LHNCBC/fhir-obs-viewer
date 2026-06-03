@@ -1,11 +1,9 @@
 import { TestBed } from '@angular/core/testing';
 import { SettingsService } from './settings.service';
 import { configureTestingModule } from 'src/test/helpers';
-import { HttpTestingController } from '@angular/common/http/testing';
 
 describe('SettingsService', () => {
   let service: SettingsService;
-  let mockHttp: HttpTestingController;
 
   beforeEach(async () => {
     await configureTestingModule(
@@ -13,7 +11,6 @@ describe('SettingsService', () => {
       { serverUrl: 'https://dbgap-api.ncbi.nlm.nih.gov/fhir/x1' }
     );
     service = TestBed.inject(SettingsService);
-    mockHttp = TestBed.inject(HttpTestingController);
   });
 
   it('should be created', () => {

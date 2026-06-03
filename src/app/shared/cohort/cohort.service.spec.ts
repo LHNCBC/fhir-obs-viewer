@@ -116,6 +116,158 @@ describe('CohortService', () => {
   });
 
 
+  it('should skip resources without patient IDs before patient lookup', (done) => {
+    const criteria: Criteria = {
+      condition: 'and',
+      rules: [
+        {
+          condition: 'and',
+          rules: [
+            {
+              field: {
+                element: 'code text',
+                value: '',
+                selectedObservationCodes: {
+                  coding: [
+                    {
+                      code: '9317-9',
+                      system: 'http://loinc.org'
+                    }
+                  ],
+                  datatype: 'String',
+                  items: ['Platelet Bld Ql Smear']
+                }
+              }
+            },
+            {
+              field: {
+                element: 'observation value',
+                value: {
+                  testValuePrefix: '',
+                  testValueModifier: ':contains',
+                  testValue: 'a',
+                  testValueUnit: '',
+                  observationDataType: 'String'
+                }
+              }
+            }
+          ],
+          resourceType: 'Observation'
+        }
+      ]
+    };
+    const matchingObservation = tenObservationBundle.entry[0].resource;
+    const patientId =
+      matchingObservation.subject.reference.replace(/^Patient\//, '');
+
+    cohort.searchForPatients(criteria, 20);
+
+    cohort.patientStream.pipe(last()).subscribe((patients) => {
+      expect(patients.map(({id}) => id)).toEqual([patientId]);
+      done();
+    });
+
+    mockHttp
+      .expectOne(
+        '$fhir/Observation?_count=20&_elements=subject&code-value-string:contains=http%3A%2F%2Floinc.org%7C9317-9%24a'
+      )
+      .flush({
+        entry: [
+          {resource: {resourceType: 'Observation', id: 'missing-subject'}},
+          {
+            resource: {
+              ...matchingObservation,
+              id: 'missing-reference',
+              subject: {}
+            }
+          },
+          {resource: matchingObservation}
+        ]
+      });
+
+    mockHttp
+      .expectOne(`$fhir/Patient?_id=${patientId}&_count=1`)
+      .flush({
+        entry: [{
+          resource: {...examplePatient, id: patientId}
+        }]
+      });
+  });
+
+
+  it('should skip resources without patient IDs before Patient criteria checks', (done) => {
+    const validObservation = {
+      resourceType: 'Observation',
+      id: 'valid-observation',
+      subject: {reference: 'Patient/pat-1'}
+    } as any;
+    const invalidObservation = {
+      resourceType: 'Observation',
+      id: 'invalid-observation'
+    } as any;
+
+    cohort.check([
+      {resource: invalidObservation, checkPassed: true},
+      {resource: validObservation, checkPassed: true}
+    ], getCriteriaFor('Patient')).subscribe((resourcesToCheck) => {
+      const invalidCheck =
+        resourcesToCheck.find(({resource}) => resource === invalidObservation);
+      const validCheck =
+        resourcesToCheck.find(({resource}) => resource.id === 'pat-1');
+
+      expect(invalidCheck?.checkPassed).toBe(false);
+      expect(validCheck?.checkPassed).toBe(true);
+      done();
+    });
+
+    mockHttp
+      .expectOne('$fhir/Patient?_id=pat-1&gender=female')
+      .flush({
+        entry: [{resource: {...examplePatient, id: 'pat-1'}}]
+      });
+  });
+
+
+  it('should skip resources without patient IDs before subject checks', (done) => {
+    const validObservation = {
+      resourceType: 'Observation',
+      id: 'valid-observation',
+      subject: {reference: 'Patient/pat-1'}
+    } as any;
+    const invalidObservation = {
+      resourceType: 'Observation',
+      id: 'invalid-observation',
+      subject: {}
+    } as any;
+
+    cohort.check([
+      {resource: invalidObservation, checkPassed: true},
+      {resource: validObservation, checkPassed: true}
+    ], {
+      condition: 'and',
+      resourceType: 'ResearchStudy',
+      rules: []
+    }).subscribe((resourcesToCheck) => {
+      const invalidCheck =
+        resourcesToCheck.find(({resource}) => resource === invalidObservation);
+      const validCheck =
+        resourcesToCheck.find(({resource}) => resource === validObservation);
+
+      expect(invalidCheck?.checkPassed).toBe(false);
+      expect(validCheck?.checkPassed).toBe(true);
+      done();
+    });
+
+    mockHttp
+      .expectOne(
+        '$fhir/ResearchStudy?_count=1&_has:ResearchSubject:study:individual=Patient/pat-1&_elements=id'
+      )
+      .flush({
+        entry: [{resource: {resourceType: 'ResearchStudy', id: 'study-1'}}]
+      });
+  });
+
+
   it('should correctly process nested ANDed criteria if parent nodes are ORed', (done) => {
     const criteria: Criteria = {
       'condition': 'and',

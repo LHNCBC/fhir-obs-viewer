@@ -447,7 +447,6 @@ describe('SelectRecordsPageComponent (when there are no studies for the user)', 
   let fixture: ComponentFixture<SelectRecordsPageComponent>;
   let mockHttp: HttpTestingController;
   let loader: HarnessLoader;
-  let cohortService: CohortService;
   const emptyBundle = {};
 
   beforeEach(async () => {
@@ -464,7 +463,6 @@ describe('SelectRecordsPageComponent (when there are no studies for the user)', 
       }
     );
     mockHttp = TestBed.inject(HttpTestingController);
-    cohortService = TestBed.inject(CohortService);
   });
 
   beforeEach(async () => {

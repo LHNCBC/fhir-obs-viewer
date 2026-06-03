@@ -111,7 +111,7 @@
           "options": {
             "main": "src/test.ts",
             "polyfills": "src/polyfills.ts",
-            "tsConfig": "src/tsconfig.spec.json",
+            "tsConfig": "src/tsconfig.json",
             "karmaConfig": "karma.conf.js",
             "assets": [
               "src/favicon.ico",
@@ -151,12 +151,25 @@
           "options": {
             "watch": true
           }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "src/**/*.ts",
+              "src/**/*.html",
+              "test/**/*.ts"
+            ]
+          }
         }
       }
     }
   },
   "cli": {
-    "analytics": false
+    "analytics": false,
+    "schematicCollections": [
+      "angular-eslint"
+    ]
   },
   "schematics": {
     "@schematics/angular:component": {
