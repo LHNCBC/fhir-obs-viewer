@@ -14,7 +14,7 @@
     "analyze": "npm run sync-xlsx-config && ng build --configuration production --source-map && source-map-explorer public/main.*",
     "analyze-gzip": "npm run sync-xlsx-config && ng build --configuration production --source-map && source-map-explorer public/main.* --gzip",
     "build": "npm run sync-xlsx-config && ng build --configuration production && npm run build-autoconfig",
-    "unit": "npm run sync-xlsx-config && ng test",
+    "unit": "npm run sync-xlsx-config && ng test --watch=false",
     "test": "npm run lint && npm run test-autoconfig && npm run unit && npm run e2e",
     "lint": "ng lint",
     "e2e": "npm run sync-xlsx-config && ng run fhir-obs-viewer:cypress-e2e",
@@ -56,7 +56,6 @@
     "zone.js": "~0.15.1"
   },
   "devDependencies": {
-    "@angular-builders/custom-webpack": "^20.0.0",
     "@angular-devkit/build-angular": "^20.3.20",
     "@angular/cli": "^20.3.20",
     "@angular/compiler-cli": "^20.3.18",
@@ -95,9 +94,6 @@
     "xmlhttprequest": "^1.8.0"
   },
   "overrides": {
-    "expo-random": "11.2.0",
-    "@angular-builders/custom-webpack": {
-      "@angular-devkit/build-angular": "20.3.23"
-    }
+    "expo-random": "11.2.0"
   }
 }

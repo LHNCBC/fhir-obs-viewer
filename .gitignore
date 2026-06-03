@@ -3,6 +3,7 @@
 # compiled output
 /public
 /autoconfig-build
+/dist/test-out
 /tmp
 /out-tsc
 # Only exists if Bazel was run
@@ -43,6 +44,7 @@ yarn-error.log
 testem.log
 /typings
 /plans
+.codex
 
 # System Files
 .DS_Store
