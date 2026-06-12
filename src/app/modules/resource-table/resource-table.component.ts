@@ -537,18 +537,22 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
   }
 
   /**
-   * Starts emitting preload events.
+   * Starts emitting preload events when the table has preload subscribers.
+   * The keep-alive timer runs outside Angular to avoid change detection on
+   * every interval tick.
    */
   runPreloadEvents(): void {
-    if (this.preloadNextPage.observers.length > 0) {
-      this.preloadSubscription = interval(this.keepAliveTimeout).subscribe(
-        () => {
-          // Preload the next page after the specified time has elapsed
-          // so that the link to the next page does not expire:
-          this.preloadNextPage.emit();
-        }
-      );
+    if (this.preloadNextPage.observers.length === 0) {
+      return;
     }
+
+    this.preloadSubscription = this.ngZone.runOutsideAngular(() =>
+      interval(this.keepAliveTimeout).subscribe(() => {
+        // Re-enter Angular only when emitting so the timer itself does not
+        // continuously trigger change detection.
+        this.ngZone.run(() => this.preloadNextPage.emit());
+      })
+    );
   }
 
   /**

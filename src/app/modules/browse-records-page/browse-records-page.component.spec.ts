@@ -8,6 +8,7 @@ import {
   verifyOutstandingRequests
 } from 'src/test/helpers';
 import { BrowseRecordsPageModule } from './browse-records-page.module';
+import { MatIconTestingModule } from '@angular/material/icon/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
 import researchStudies from 'src/test/test-fixtures/research-studies.json';
 import threeVariables from 'src/test/test-fixtures/variables-3.json';
@@ -28,7 +29,7 @@ describe('BrowseRecordsPageComponent', () => {
     await configureTestingModule(
       {
         declarations: [BrowseRecordsPageComponent],
-        imports: [BrowseRecordsPageModule]
+        imports: [BrowseRecordsPageModule, MatIconTestingModule]
       },
       {
         features: {
@@ -63,8 +64,9 @@ describe('BrowseRecordsPageComponent', () => {
    * Load studies at the beginning
    */
   async function loadStudies(): Promise<void> {
-    await fixture.whenStable();
-    fixture.detectChanges();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
     mockHttp
       .expectOne('$fhir/ResearchStudy?_count=3000')
       .flush(researchStudies);
@@ -77,12 +79,7 @@ describe('BrowseRecordsPageComponent', () => {
    */
   async function selectTab(label: string): Promise<void> {
     const tabGroup = await loader.getHarness(MatTabGroupHarness);
-    // TODO: "MatTabGroupHarness.selectTab" works but returns a Promise which never resolves.
-    tabGroup.selectTab({ label });
-    // TODO: The workaround is to add a pause
-    await new Promise((resolve) => {
-      setTimeout(resolve, 200);
-    });
+    return tabGroup.selectTab({ label });
   }
 
   /**
@@ -90,6 +87,9 @@ describe('BrowseRecordsPageComponent', () => {
    * @param n - number of expected records
    */
   async function expectNumberOfRecords(n: number): Promise<void> {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
     const tabGroup = await loader.getHarness(MatTabGroupHarness);
     const currentTab = await tabGroup.getSelectedTab();
     const table = await currentTab.getHarness(MatTableHarness);
@@ -103,8 +103,10 @@ describe('BrowseRecordsPageComponent', () => {
   async function loadVariables(): Promise<void> {
     (ResourceTableComponent.prototype
       .runPreloadEvents as jasmine.Spy).calls.reset();
-    await selectTab('Variables');
-    fixture.detectChanges();
+    const selectVariablesTabPromise = selectTab('Variables');
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
     expect(component.variableTable.runPreloadEvents).not.toHaveBeenCalled();
     mockHttp
       .expectOne((req: HttpRequest<any>) => {
@@ -115,11 +117,28 @@ describe('BrowseRecordsPageComponent', () => {
         );
       })
       .flush(fourVariables);
+    await selectVariablesTabPromise;
     // TODO: In Angular 19, we need "resize" event to trigger rendering table here
     window.dispatchEvent(new Event('resize'));
-    fixture.detectChanges();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
     expect(component.variableTable.runPreloadEvents).toHaveBeenCalledOnceWith();
     await expectNumberOfRecords(4);
+  }
+
+  /**
+   * Selects the loaded ResearchStudy with the specified ID.
+   * @param studyId - ResearchStudy ID to select.
+   */
+  function selectStudy(studyId: string): void {
+    const row = component.resourceTable.dataSource.data.find(
+      (record) => record.resource.id === studyId
+    );
+    expect(row).toBeDefined();
+    component.resourceTable.selectedResources.select(row.resource);
+    component.onSelectionChange('ResearchStudy');
+    fixture.detectChanges();
   }
 
   it('should create', () => {
@@ -139,11 +158,11 @@ describe('BrowseRecordsPageComponent', () => {
     await loadStudies();
     await loadVariables();
     await selectTab('Studies');
-    // Select first study
-    fixture.debugElement
-      .queryAll(By.css('mat-tab-body:first-child mat-checkbox label'))[1]
-      .nativeElement.click();
-    await selectTab('Variables');
+    selectStudy('phs002409');
+    const selectVariablesTabPromise = selectTab('Variables');
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
     mockHttp
       .expectOne((req: HttpRequest<any>) => {
         return (
@@ -154,6 +173,7 @@ describe('BrowseRecordsPageComponent', () => {
         );
       })
       .flush(threeVariables);
+    await selectVariablesTabPromise;
     await expectNumberOfRecords(3);
   });
 

@@ -3,7 +3,7 @@
  */
 import { Injectable } from '@angular/core';
 import { CreateCohortMode } from '../cohort/cohort.service';
-import { Step } from '../../modules/stepper/stepper.component';
+import { Step } from '../../modules/stepper/step.enum';
 
 @Injectable({
   providedIn: 'root'

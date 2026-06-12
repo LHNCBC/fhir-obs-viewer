@@ -482,6 +482,44 @@ describe('DefineCohortComponent', () => {
       .flush(tenPatientBundle);
   });
 
+});
+
+
+describe('DefineCohortComponent', () => {
+  let component: DefineCohortPageComponent;
+  let fixture: ComponentFixture<DefineCohortPageComponent>;
+  let mockHttp: HttpTestingController;
+  let cohort: CohortService;
+
+
+  beforeEach(async () => {
+    await configureTestingModule({
+      declarations: [DefineCohortPageComponent],
+      imports: [
+        DefineCohortPageModule,
+        MatIconTestingModule
+      ]
+    }, {
+      serverUrl: 'https://lforms-fhir.nlm.nih.gov/baseR4'
+    });
+    mockHttp = TestBed.inject(HttpTestingController);
+    cohort = TestBed.inject(CohortService);
+  });
+
+
+  beforeEach(() => {
+    fixture = TestBed.createComponent(DefineCohortPageComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+
+  afterEach(() => {
+    // Verify that no unmatched requests are outstanding
+    mockHttp.verify();
+  });
+
+
   it('should load Patients by EvidenceVariable criteria', (done) => {
     component.defineCohortForm.get('maxNumberOfPatients').setValue(20);
     component.patientParams.queryCtrl.setValue({
@@ -513,7 +551,7 @@ describe('DefineCohortComponent', () => {
 
     mockHttp
       .expectOne(
-        `$fhir/Observation?_count=20&_elements=subject&evidencevariable=someDefaultURL/EvidenceVariable/phv00492039`
+        `$fhir/Observation?_count=20&_elements=subject&evidencevariable=https://lforms-fhir.nlm.nih.gov/baseR4/EvidenceVariable/phv00492039`
       )
       .flush({
         entry: [
@@ -539,4 +577,5 @@ describe('DefineCohortComponent', () => {
       ]
     });
   });
+
 });

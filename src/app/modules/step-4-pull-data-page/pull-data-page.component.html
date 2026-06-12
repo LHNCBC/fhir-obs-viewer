@@ -27,7 +27,9 @@
   }
 </div>
 
-<mat-tab-group dynamicHeight mat-stretch-tabs="false" mat-align-tabs="start">
+<mat-tab-group dynamicHeight mat-stretch-tabs="false" mat-align-tabs="start"
+  [selectedIndex]="selectedTabIndex"
+  (selectedTabChange)="selectTab($event.index)">
   @for (resourceType of visibleResourceTypes; track resourceType) {
     <mat-tab [label]="getPluralFormOfResourceType(resourceType)">
       <div class="v-box tab-content">

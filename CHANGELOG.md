@@ -10,10 +10,23 @@ This project follows [Semantic Versioning](http://semver.org/).
 - Renamed the Angular spec TypeScript config to `src/tsconfig.json` and updated
   the unit-test target to use it.
 - Removed unused imports and test helpers surfaced by the new lint rules.
+- Updated autocomplete dropdown styles and tests for the `lhc-tools-` prefixed
+  DOM IDs used by newer `autocomplete-lhc` builds.
+- Simplified Angular and Cypress test setup, including Material icon test
+  modules, revised tab-harness timing, and removal of the custom Cypress webpack
+  preprocessor config.
+- Moved the wizard `Step` enum into its own module and updated RAS token
+  handling to import it directly, avoiding a circular runtime dependency while
+  preserving the previous re-export.
+- Updated Pull Data resource tabs to track the selected tab explicitly, keep the
+  current resource observable synchronized, and render newly added tabs before
+  selecting them.
 
 ### Fixed
 - Cohort searches now skip resources without Patient IDs before Patient lookups
   and criteria checks, avoiding malformed Patient and subject queries.
+- Resource table preload timers now run outside Angular change detection and
+  only re-enter Angular when emitting the preload event.
 
 ## [7.9.4] - 2026-05-18
 ### Fixed

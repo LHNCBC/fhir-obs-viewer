@@ -215,7 +215,7 @@ describe('ObservationCodeLookupComponent', () => {
         await keyDownInAutocompleteInput(input, ARROW_DOWN);
         // Check if autocompleter displays the dropdown list
         expect(
-          (document.querySelector('#searchResults') as HTMLElement).style
+          (document.querySelector('#lhc-tools-searchResults') as HTMLElement).style
             .visibility
         ).toBe('visible');
         await keyDownInAutocompleteInput(input, ARROW_DOWN);
@@ -262,7 +262,7 @@ describe('ObservationCodeLookupComponent', () => {
         await keyDownInAutocompleteInput(input, ARROW_DOWN);
         // Check if autocompleter displays the dropdown list
         expect(
-          (document.querySelector('#searchResults') as HTMLElement).style
+          (document.querySelector('#lhc-tools-searchResults') as HTMLElement).style
             .visibility
         ).toBe('visible');
         await keyDownInAutocompleteInput(input, ARROW_DOWN);
