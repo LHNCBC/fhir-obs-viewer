@@ -10,6 +10,7 @@ This project follows [Semantic Versioning](http://semver.org/).
 - Renamed the Angular spec TypeScript config to `src/tsconfig.json` and updated
   the unit-test target to use it.
 - Removed unused imports and test helpers surfaced by the new lint rules.
+- Updated autocomplete-lhc to version 20.1.1.
 - Updated autocomplete dropdown styles and tests for the `lhc-tools-` prefixed
   DOM IDs used by newer `autocomplete-lhc` builds.
 - Simplified Angular and Cypress test setup, including Material icon test
@@ -21,6 +22,12 @@ This project follows [Semantic Versioning](http://semver.org/).
 - Updated Pull Data resource tabs to track the selected tab explicitly, keep the
   current resource observable synchronized, and render newly added tabs before
   selecting them.
+- Migrated Angular unit tests from Karma/Jasmine to Angular's Vitest-based
+  unit-test builder, including shared setup shims for existing Jasmine-style
+  specs and jsdom asset loading.
+- Updated unit-test specs and helpers to run reliably under Vitest, including
+  direct tab/table assertions, autocomplete request flushing, and typed RxJS
+  subjects.
 
 ### Fixed
 - Cohort searches now skip resources without Patient IDs before Patient lookups

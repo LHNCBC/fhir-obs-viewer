@@ -67,6 +67,12 @@ describe('EllipsisTextComponent', () => {
     hostComponent.text = text;
     fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();
+    spyOn(div, 'getBoundingClientRect').and.returnValue({
+      right: 100
+    } as DOMRect);
+    spyOn(div.querySelector('span'), 'getBoundingClientRect').and.returnValue({
+      right: expectedTooltipText ? 120 : 80
+    } as DOMRect);
     expect(component.getTooltipText).not.toHaveBeenCalled();
     expect(tooltip.message).toBe('');
 

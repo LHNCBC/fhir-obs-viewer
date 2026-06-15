@@ -81,6 +81,22 @@
                   "maximumError": "10kb"
                 }
               ]
+            },
+            "unit-test": {
+              "aot": false,
+              "polyfills": [
+                "zone.js"
+              ],
+              "assets": [
+                "src/favicon.ico",
+                "src/assets",
+                "src/conf/settings.json5",
+                "src/conf/csv"
+              ],
+              "styles": [
+                "./node_modules/@angular/material/prebuilt-themes/indigo-pink.css",
+                "src/styles.less"
+              ]
             }
           }
         },
@@ -104,26 +120,14 @@
           }
         },
         "test": {
-          "builder": "@angular/build:karma",
+          "builder": "@angular/build:unit-test",
           "options": {
-            "main": "src/test.ts",
-            "polyfills": [
-              "src/polyfills.ts"
-            ],
+            "buildTarget": "fhir-obs-viewer:build:unit-test",
+            "runner": "vitest",
+            "runnerConfig": "vitest-base.config.ts",
             "tsConfig": "src/tsconfig.json",
-            "karmaConfig": "karma.conf.js",
-            "assets": [
-              "src/favicon.ico",
-              "src/assets",
-              "src/conf/settings.json5",
-              "src/conf/csv"
-            ],
-            "styles": [
-              "./node_modules/@angular/material/prebuilt-themes/indigo-pink.css",
-              "src/styles.less"
-            ],
-            "scripts": [
-              "./node_modules/jquery/dist/jquery.min.js"
+            "setupFiles": [
+              "src/test.ts"
             ]
           }
         },

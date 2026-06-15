@@ -57,9 +57,9 @@ export class SettingsPageComponent implements OnDestroy {
    * Subject that emits when the settings form group is ready for use.
    * Used to notify validators that initialization is complete.
    */
-  ready = new ReplaySubject();
+  ready = new ReplaySubject<void>();
   // Subject to emit a destroy event
-  destroy = new Subject();
+  destroy = new Subject<void>();
   // Reference to the dialog about problems with batch requests
   dialogRef: MatDialogRef<AlertDialogComponent>;
   // A message if the server is connected successfully with basic authentication.

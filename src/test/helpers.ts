@@ -102,6 +102,31 @@ export async function configureTestingModule(
       fhirBackend.init();
     });
 
+    await flushSettingsRequests(mockHttp);
+
+    await fhirBackend.initialized
+      .pipe(
+        filter((status) => status === ConnectionStatus.Ready),
+        take(1)
+      )
+      .toPromise();
+  }
+
+  if (options.definitions) {
+    spyOn(fhirBackend, 'getCurrentDefinitions').and.returnValue(
+      options.definitions
+    );
+  }
+}
+
+
+/**
+ * Flushes settings and generated definitions requests from source assets.
+ * @param mockHttp - HTTP testing controller.
+ */
+export async function flushSettingsRequests(
+  mockHttp: HttpTestingController
+): Promise<void> {
   // Pass-through for settings file
   mockHttp
     .expectOne(`conf/settings.json5`)
@@ -123,21 +148,8 @@ export async function configureTestingModule(
       return false;
     });
   }, 20);
-
-  await fhirBackend.initialized
-    .pipe(
-      filter((status) => status === ConnectionStatus.Ready),
-      take(1)
-    )
-    .toPromise();
-  }
-
-  if (options.definitions) {
-    spyOn(fhirBackend, 'getCurrentDefinitions').and.returnValue(
-      options.definitions
-    );
-  }
 }
+
 
 /**
  * Verify that no unmatched requests except for SVG icons are outstanding
