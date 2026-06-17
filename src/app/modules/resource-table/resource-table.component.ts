@@ -23,7 +23,7 @@ import {
   UntypedFormGroup
 } from '@angular/forms';
 import { ColumnDescription } from '../../types/column.description';
-import { distinctUntilChanged, sample, tap } from 'rxjs/operators';
+import { auditTime, distinctUntilChanged, sample, tap } from 'rxjs/operators';
 import {
   dispatchWindowResize,
   escapeStringForRegExp,
@@ -36,11 +36,13 @@ import {
 import {
   ColumnValuesService
 } from '../../shared/column-values/column-values.service';
-import { BehaviorSubject, interval, Observable, Subscription } from 'rxjs';
 import {
-  TableItemSizeDirective,
-  TableVirtualScrollDataSource
-} from 'ng-table-virtual-scroll';
+  BehaviorSubject,
+  interval,
+  Observable,
+  Subscription
+} from 'rxjs';
+import { MatTableDataSource } from '@angular/material/table';
 import {
   SettingsService
 } from '../../shared/settings-service/settings.service';
@@ -151,7 +153,7 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
         )
         .subscribe((value) => {
           if (this.filterChanged.observers.length) {
-            this.scrollViewport.scrollToIndex(0);
+            this.scrollViewport?.scrollToIndex(0);
             this.filterChanged.next(value);
           } else {
             this.setClientFilter({ ...value });
@@ -208,7 +210,9 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
     return {};
   }
   @ViewChild('panel') panel: MatExpansionPanel;
-  @ViewChild(TableItemSizeDirective) itemSizeDirective: TableItemSizeDirective;
+  // Fixed row height (in pixels) used by the CDK virtual scroll viewport.
+  // (See --mat-table-row-item-container-height).
+  readonly rowHeight = 52;
   @Input() columnDescriptions: ColumnDescription[];
   // If true, client-side filtering is applied by default.
   // To enable server-side filtering, define a "(filterChanged)" handler.
@@ -252,7 +256,42 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
   @Input() loadingStatistics: (string | number)[][] = [];
   @Input() myStudyIds: string[] = [];
   @Input() selectAny = false;
-  @ViewChild(CdkVirtualScrollViewport) scrollViewport: CdkVirtualScrollViewport;
+  private scrollViewportRef: CdkVirtualScrollViewport | undefined;
+  private scrollViewportSubscription: Subscription;
+  private scrollIdleTimeout: ReturnType<typeof setTimeout>;
+  private viewportScrolling = false;
+  private hasPendingResourceRowsUpdate = false;
+  private readonly scrollIdleDelay = 150;
+
+  /**
+   * Virtual scroll viewport used for table scrolling operations.
+   * The scroll listener is registered outside Angular so scrolling does not
+   * trigger change detection before CDK virtual scroll updates its range.
+   * @param viewport - virtual scroll viewport instance, if the table is shown.
+   */
+  @ViewChild(CdkVirtualScrollViewport)
+  set scrollViewport(viewport: CdkVirtualScrollViewport | undefined) {
+    if (this.scrollViewportRef === viewport) {
+      return;
+    }
+
+    this.scrollViewportSubscription?.unsubscribe();
+    this.scrollViewportRef = viewport;
+
+    if (viewport) {
+      this.subscribeToViewportScroll(viewport);
+      setTimeout(() => this.onScroll());
+    }
+  }
+
+  /**
+   * Returns the virtual scroll viewport used by the table.
+   */
+  get scrollViewport(): CdkVirtualScrollViewport | undefined {
+    return this.scrollViewportRef;
+  }
+
+
   @Output() loadNextPage = new EventEmitter();
   // Subscription to interval to periodically preload the next page.
   // This is necessary to avoid expiration of the link to the next page.
@@ -272,7 +311,7 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
   selectedResources = new SelectionModel<Resource>(true, []);
   @Output() selectionChange = this.selectedResources.changed;
   filtersForm: UntypedFormGroup = new UntypedFormBuilder().group({});
-  dataSource = new TableVirtualScrollDataSource<TableRow>([]);
+  dataSource = new MatTableDataSource<TableRow>([]);
   @Input('loadTime') externalLoadTime: number;
   @Input('loadedDateTime') externalLoadedDateTime: number;
   loadTime = 0;
@@ -386,6 +425,8 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
 
   ngOnDestroy(): void {
     this.subscriptions.forEach((subscription) => subscription.unsubscribe());
+    this.scrollViewportSubscription?.unsubscribe();
+    clearTimeout(this.scrollIdleTimeout);
     this.preloadSubscription?.unsubscribe();
   }
 
@@ -452,61 +493,7 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
 
     // Update resource table rows
     if (changes['resources'] && changes['resources'].currentValue) {
-      const allColumns = this.columnDescriptionsService.getAvailableColumns(
-        this.resourceTypeColumns || this.resourceType,
-        this.context
-      );
-      let columnsWithDataChanged = false;
-      const newRows: TableRow[] = this.resources.map((resource) => ({
-        resource,
-        cells: allColumns.reduce((desc, columnDesc) => {
-          const cellText = this.getCellStrings(resource, columnDesc).join('; ');
-          desc[columnDesc.element] = cellText;
-          if (!this.columnsWithData[columnDesc.element] && cellText) {
-            this.columnsWithData[columnDesc.element] = true;
-            columnsWithDataChanged = true;
-          }
-          return desc;
-        }, {} as TableCells)
-      }));
-
-      if (!this.sortChanged.observers.length) {
-        this.clientSort(newRows);
-      }
-
-      if (this.enableFiltering) {
-        // Move selectable studies to the beginning of table.
-        this.dataSource.data = newRows.sort((a: TableRow, b: TableRow) => {
-          if (
-            !this.myStudyIds.includes(a.resource.id) &&
-            this.myStudyIds.includes(b.resource.id)
-          ) {
-            return 1;
-          }
-          if (
-            this.myStudyIds.includes(a.resource.id) &&
-            !this.myStudyIds.includes(b.resource.id)
-          ) {
-            return -1;
-          }
-          return 0;
-        });
-      } else {
-        this.dataSource.data = newRows;
-      }
-      if (columnsWithDataChanged) {
-        this.columnDescriptionsService.setColumnsWithData(
-          this.resourceTypeColumns || this.resourceType,
-          this.context,
-          Object.keys(this.columnsWithData)
-        );
-      }
-      this.preloadSubscription?.unsubscribe();
-      // setTimeout is needed to update the table after this.dataSource changes
-      setTimeout(() => {
-        this.onScroll();
-      });
-      this.runPreloadEvents();
+      this.updateResourceRowsWhenIdle();
     }
 
     // Update resource table columns
@@ -556,6 +543,125 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
   }
 
   /**
+   * Subscribes to viewport scroll events outside Angular change detection.
+   * @param viewport - virtual scroll viewport to observe.
+   */
+  private subscribeToViewportScroll(viewport: CdkVirtualScrollViewport): void {
+    this.scrollViewportSubscription = new Subscription();
+    this.ngZone.runOutsideAngular(() => {
+      this.scrollViewportSubscription.add(
+        viewport.elementScrolled().subscribe(() => {
+          this.markViewportScrolling();
+        })
+      );
+      this.scrollViewportSubscription.add(
+        viewport.elementScrolled().pipe(auditTime(100)).subscribe(() => {
+          if (this.isScrolledNearBottom()) {
+            this.ngZone.run(() => this.loadNextPage.emit());
+          }
+        })
+      );
+    });
+  }
+
+
+  /**
+   * Marks the virtual scroll viewport as actively scrolling until no scroll
+   * events are seen for the configured idle delay.
+   */
+  private markViewportScrolling(): void {
+    this.viewportScrolling = true;
+    clearTimeout(this.scrollIdleTimeout);
+    this.scrollIdleTimeout = setTimeout(() => {
+      this.ngZone.run(() => this.onViewportScrollIdle());
+    }, this.scrollIdleDelay);
+  }
+
+  /**
+   * Applies any resource update that arrived while the viewport was scrolling.
+   */
+  private onViewportScrollIdle(): void {
+    this.viewportScrolling = false;
+    if (this.hasPendingResourceRowsUpdate) {
+      this.hasPendingResourceRowsUpdate = false;
+      this.updateResourceRows();
+    }
+  }
+
+  /**
+   * Updates table rows immediately or waits until scrolling is idle.
+   */
+  private updateResourceRowsWhenIdle(): void {
+    if (this.viewportScrolling) {
+      this.hasPendingResourceRowsUpdate = true;
+      return;
+    }
+    this.updateResourceRows();
+  }
+
+  /**
+   * Rebuilds the table rows from the current resources input.
+   */
+  private updateResourceRows(): void {
+    const allColumns = this.columnDescriptionsService.getAvailableColumns(
+      this.resourceTypeColumns || this.resourceType,
+      this.context
+    );
+    let columnsWithDataChanged = false;
+    const newRows: TableRow[] = this.resources.map((resource) => ({
+      resource,
+      cells: allColumns.reduce((desc, columnDesc) => {
+        const cellText = this.getCellStrings(resource, columnDesc).join('; ');
+        desc[columnDesc.element] = cellText;
+        if (!this.columnsWithData[columnDesc.element] && cellText) {
+          this.columnsWithData[columnDesc.element] = true;
+          columnsWithDataChanged = true;
+        }
+        return desc;
+      }, {} as TableCells)
+    }));
+
+    if (!this.sortChanged.observers.length) {
+      this.clientSort(newRows);
+    }
+
+    if (this.enableFiltering) {
+      // Move selectable studies to the beginning of table.
+      this.dataSource.data = newRows.sort((a: TableRow, b: TableRow) => {
+        if (
+          !this.myStudyIds.includes(a.resource.id) &&
+          this.myStudyIds.includes(b.resource.id)
+        ) {
+          return 1;
+        }
+        if (
+          this.myStudyIds.includes(a.resource.id) &&
+          !this.myStudyIds.includes(b.resource.id)
+        ) {
+          return -1;
+        }
+        return 0;
+      });
+    } else {
+      this.dataSource.data = newRows;
+    }
+    if (columnsWithDataChanged) {
+      this.columnDescriptionsService.setColumnsWithData(
+        this.resourceTypeColumns || this.resourceType,
+        this.context,
+        Object.keys(this.columnsWithData)
+      );
+    }
+    this.preloadSubscription?.unsubscribe();
+    // setTimeout is needed to update the table after this.dataSource changes
+    setTimeout(() => {
+      this.onScroll();
+    });
+    this.runPreloadEvents();
+  }
+
+
+  /**
    * Set material table columns from column descriptions.
    * Set up filter form and table filtering logic if client filtering is enabled.
    * @param isSortHeaderFocused - is there focus on the column header and should
@@ -588,18 +694,15 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
         });
       }
     }
-    // ng-table-virtual-scroll updates the sticky header position when scrolling
-    // the table content. But when the header content changes, the position
-    // attributes are reset. In this case, manually update the header position.
+    // The CDK table virtual scrolling automatically re-applies the sticky
+    // header position when the header content changes, so only the focus needs
+    // to be restored on the sort header after the table header is redrawn.
     setTimeout(() => {
-      const strategy = this.itemSizeDirective?.scrollStrategy;
-      if (strategy) {
-        strategy.stickyChange.next(
-          strategy.viewport.getOffsetToRenderedContentStart()
-        );
-      }
       if (isSortHeaderFocused) {
-        const scrollViewport = this.scrollViewport.elementRef.nativeElement;
+        const scrollViewport = this.scrollViewport?.elementRef.nativeElement;
+        if (!scrollViewport) {
+          return;
+        }
         const toFocus =
           // Focus on the sorted column header
           (this.sort &&
@@ -728,7 +831,7 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
     if (!sort.active || sort.direction === '') {
       return;
     }
-    this.scrollViewport.scrollToIndex(0);
+    this.scrollViewport?.scrollToIndex(0);
     if (this.sortChanged.observers.length) {
       this.sortChanged.emit(sort);
       return;
@@ -949,9 +1052,19 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
   }
 
   /**
-   * Emits the next page load event when scrolling to the bottom of the table
+   * Emits the next page load event when the table is close to the bottom.
    */
   onScroll(): void {
+    if (this.isScrolledNearBottom()) {
+      this.loadNextPage.emit();
+    }
+  }
+
+  /**
+   * Returns whether the table viewport is close enough to the bottom to load
+   * another page.
+   */
+  private isScrolledNearBottom(): boolean {
     const scrollViewport = this.scrollViewport?.elementRef.nativeElement;
     if (scrollViewport) {
       const delta = 150;
@@ -963,9 +1076,10 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
         scrollViewport.clientHeight;
 
       if (isNotDetached && delta >= bottomDistance) {
-        this.loadNextPage.emit();
+        return true;
       }
     }
+    return false;
   }
 
   /**

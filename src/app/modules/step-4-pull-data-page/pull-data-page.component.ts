@@ -41,7 +41,7 @@ import { saveAs } from 'file-saver';
 // Use ECMAScript module distributions of csv-stringify package for our browser app.
 // See https://csv.js.org/stringify/distributions/browser_esm/
 import { stringify } from 'csv-stringify/browser/esm/sync';
-import { TableVirtualScrollDataSource } from 'ng-table-virtual-scroll';
+import { MatTableDataSource } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
 import {
   AutocompleteParameterValue
@@ -59,8 +59,7 @@ import { Observation } from 'fhir/r4';
   selector: 'app-pull-data-page',
   templateUrl: './pull-data-page.component.html',
   styleUrls: [
-    './pull-data-page.component.less',
-    '../resource-table/resource-table.component.less'
+    './pull-data-page.component.less'
   ],
   standalone: false
 })
@@ -108,8 +107,11 @@ export class PullDataPageComponent
 
   // Columns for the Variable-Patient table
   variablePatientTableColumns: string[] = [];
+  // Fixed row height (in pixels) used by the CDK virtual scroll viewport
+  // (See --mat-table-row-item-container-height).
+  readonly rowHeight = 52;
   // DataSource for the Variable-Patient table
-  variablePatientTableDataSource = new TableVirtualScrollDataSource<TableRow>(
+  variablePatientTableDataSource = new MatTableDataSource<TableRow>(
     []
   );
   // Whether the Observation table can be converted to Variable-Patient table.
@@ -660,6 +662,9 @@ export class PullDataPageComponent
    */
   toggleFullscreen(): void {
     this.fullscreen = !this.fullscreen;
+    setTimeout(() => {
+      dispatchWindowResize();
+    }, 200);
   }
 
   /**

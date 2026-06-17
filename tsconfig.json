@@ -11,6 +11,9 @@
     "moduleResolution": "bundler",
     "importHelpers": true,
     "target": "ES2022",
+    // The following line fixes type errors in templates reported by the IDE:
+    // "Type ... must have a [Symbol.iterator]() method that returns an iterator."
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "es2020",
     "resolveJsonModule": true,
     "useDefineForClassFields": false

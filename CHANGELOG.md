@@ -28,6 +28,15 @@ This project follows [Semantic Versioning](http://semver.org/).
 - Updated unit-test specs and helpers to run reliably under Vitest, including
   direct tab/table assertions, autocomplete request flushing, and typed RxJS
   subjects.
+- Replaced the `ng-table-virtual-scroll` dependency with an app-owned
+  CDK/Material table virtual-scroll directive used by the Resource Table and
+  Pull Data variable-patient tables.
+- Updated Resource Table scrolling to observe viewport events outside Angular,
+  debounce near-bottom page loading, and defer row rebuilds until scrolling is
+  idle.
+- Refined the Pull Data variable-patient table layout, including fixed row
+  sizing, ellipsis handling for long headers and cells, and fullscreen resize
+  refreshes.
 
 ### Fixed
 - Cohort searches now skip resources without Patient IDs before Patient lookups

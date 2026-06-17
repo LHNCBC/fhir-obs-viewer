@@ -64,10 +64,10 @@
   patterns, line lengths near 80 where practical).
 - Blank lines: keep two between declarations; for JSDoc, keep two above the
   block and none between the block and its declaration.
-- In test files (e.g. *.spec.ts and *.cy.ts), keep two blank lines before and
-  after describe(...) blocks and between it(...) blocks; inside each
-  describe(...), keep one blank line before the first it(...) and after the last
-  it(...).
+- In test files (e.g. `*.spec.ts` and `*.cy.ts`), keep two blank lines before
+  and after `describe(...)` blocks and between `it(...)` blocks; inside each
+  `describe(...)`, keep one blank line before the first `it(...)` and after the
+  last `it(...)`.
 
 ## Integration points and gotchas
 - URL query params (`server`, `isSmart`, `prev-version`, `ras`) alter behavior;
