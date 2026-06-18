@@ -15,6 +15,12 @@ const generatedDefinitionsPath = path.join(
 const packageJsonPath = path.join(repoRoot, 'package.json');
 const appVersionPath = path.join(repoRoot, 'src/app/shared/app-version.ts');
 
+
+/**
+ * Builds the generated definitions index from the source index and webpack
+ * options, then writes it to generated-index.json.
+ * @returns {void}
+ */
 function syncGeneratedDefinitions() {
   const definitionsIndex = JSON.parse(
     fs.readFileSync(definitionsIndexPath, 'utf8')
@@ -33,6 +39,11 @@ function syncGeneratedDefinitions() {
   );
 }
 
+
+/**
+ * Writes the app version (read from package.json) to app-version.ts.
+ * @returns {string} The synced application version.
+ */
 function syncAppVersion() {
   const { version } = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
   fs.writeFileSync(
@@ -44,6 +55,12 @@ function syncAppVersion() {
   return version;
 }
 
+
+/**
+ * Syncs the generated definitions index and the app version file.
+ * @returns {{generatedDefinitionsPath: string, appVersionPath: string,
+ *   appVersion: string}} Paths of the generated files and the app version.
+ */
 function syncGeneratedAssets() {
   syncGeneratedDefinitions();
   const appVersion = syncAppVersion();

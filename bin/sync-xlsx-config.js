@@ -161,6 +161,14 @@ function updateAppSettings(url2desc) {
   fs.writeFileSync(settingsPath, settingsWriter.toSource());
 }
 
+
+/**
+ * Syncs application configuration from XLSX files (unless SKIP_XLSX=1) and
+ * regenerates the definitions index and app version file.
+ * @returns {Promise<{skipped: boolean, updatedUrlCount: number,
+ *   generatedAssets: Object}>} Result describing whether the XLSX sync was
+ *   skipped, how many service URLs were updated, and the generated assets.
+ */
 async function syncXlsxConfig() {
   const skipXlsx = process.env.SKIP_XLSX === '1';
   let updatedUrlCount = 0;

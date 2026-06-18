@@ -519,6 +519,16 @@ function getSearchParametersConfig(
   return resultConfig;
 }
 
+
+/**
+ * Populates the definitions index with search parameters configuration for
+ * each FHIR version listed in the index.
+ * @param {Object} index - definitions index object (parsed from index.json)
+ * @param {Object} options - webpack loader options keyed by version name
+ * @param {string} contextPath - base directory containing per-version
+ *        definition folders
+ * @return {Object} The mutated index with a populated configByVersionName.
+ */
 function buildDefinitionsIndex(index, options, contextPath) {
   index.configByVersionName = Object.values(
     index.versionNameByVersionNumberRegex
@@ -537,6 +547,12 @@ function buildDefinitionsIndex(index, options, contextPath) {
   return index;
 }
 
+
+/**
+ * Webpack loader entry point for "definitions/index.json".
+ * @param {string} source - raw JSON content of the index file
+ * @return {string} The processed index serialized back to a JSON string.
+ */
 function loader(source) {
   const index = JSON.parse(source);
   const options =
