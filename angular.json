@@ -126,6 +126,10 @@
             "runner": "vitest",
             "runnerConfig": "vitest-base.config.ts",
             "tsConfig": "src/tsconfig.json",
+            "include": [
+              "**/*.spec.ts",
+              "**/*.spec.js"
+            ],
             "setupFiles": [
               "src/test.ts"
             ]
