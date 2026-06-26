@@ -18,6 +18,9 @@
 - UI workflow is a wizard in `src/app/modules/stepper/stepper.component.ts`
   (settings -> action -> research-study/select-records/browse-public-data ->
   cohort -> pull data) driven by backend connection status and cohort mode.
+- Wizard step order is the `Step` enum in
+  `src/app/modules/stepper/step.enum.ts`; `stepper.component.ts` re-exports it
+  for existing imports.
 - Auth paths are route-based: SMART launch in `src/app/modules/launch/`,
   OAuth2 callback in `src/app/modules/oauth2-token-callback/`, and RAS callback
   in `src/app/modules/ras-token-callback/`.
@@ -27,8 +30,11 @@
 ## Build/test workflows that matter
 - Install + dev server:
   - `npm install`
-  - `npm start`
+  - `npm start` (runs `npm run sync-xlsx-config` before `ng serve`)
+  - `npm run start:skip-xlsx` when XLSX regeneration is unnecessary.
 - Fast UI checks: `npm run unit` and `npm run lint`.
+- Unit tests run through Angular's Vitest target (`angular.json`) with
+  file parallelism disabled in `vitest-base.config.ts`.
 - Full test run: `npm test` (autoconfig + unit + Cypress).
 - Autoconfig-specific checks:
   - `npm run test-autoconfig`
@@ -38,14 +44,25 @@
   - `npm run build-autoconfig` bundles CLI into `autoconfig-build/`.
 
 ## Project-specific patterns and conventions
-- Do not edit generated artifacts in `public/` or `autoconfig-build/`.
+- Do not edit generated artifacts in `public/`, `autoconfig-build/`,
+  `src/app/shared/definitions/generated-index.json`, or
+  `src/app/shared/app-version.ts`; generated CSV files in `src/conf/csv/`
+  should come from `src/conf/xlsx/`.
 - Avoid reading or searching within `.idea/` unless the user explicitly asks for it.
-- Focus discovery and edits on `src/`, `autoconfig-src/`, `test/`, and
-  `webpack/` by default.
+- Focus discovery and edits on `src/`, `autoconfig-src/`, `bin/`, and
+  `test/` by default.
+- `src/query-builder/` is a vendored copy of ngx-angular-query-builder; avoid
+  selector/style churn there unless changing that library copy intentionally.
 - Definitions pipeline: XLSX -> CSV/settings happens in
-  `webpack/extra-webpack.config.js` during Angular build.
-- XLSX files in `src/conf/xlsx/` are source-of-truth for definitions; build
-  generates `src/conf/csv/` and updates `src/conf/settings.json5`.
+  `bin/sync-xlsx-config.js` before serve/build/test/analyze scripts.
+- XLSX files in `src/conf/xlsx/` are source-of-truth for definitions;
+  `npm run sync-xlsx-config` generates `src/conf/csv/` and updates
+  `definitionsFile` entries in `src/conf/settings.json5`.
+- `bin/sync-generated-assets.js` builds
+  `src/app/shared/definitions/generated-index.json` from
+  `src/app/shared/definitions/index.json`,
+  `src/app/shared/definitions/webpack-options.json`, and the R4/R5 definition
+  JSON files, and writes `src/app/shared/app-version.ts`.
 - Autoconfig copies generated CSV templates into `autoconfig-build/conf/csv/`
   for a relocatable bundle.
 - `autoconfig-src/build-autoconfig.js` also stages
@@ -58,6 +75,9 @@
   column handling (`autoconfig-src/definitions-generator.js`).
 - Save generated planning prompts under `plans/` using
   `plan-<camelCaseName>.prompt.md` filenames.
+- Angular code intentionally stays NgModule-based (`standalone: false`) with
+  constructor DI; ESLint disables `prefer-standalone`, `prefer-inject`, and
+  template `prefer-control-flow`, so avoid incidental migrations.
 - Ensure that all added or updated JavaScript/TypeScript functions are
   accompanied by correct JSDoc comments.
 - Keep edits narrow and style-consistent (quote style, import style, async
@@ -78,4 +98,3 @@
   `NODE_TLS_REJECT_UNAUTHORIZED=0`; this is intentional for some FHIR endpoints.
 - If terminal `node`/`npm` is missing, source repo `bashrc` then rerun command:
   `source ./bashrc`.
-
