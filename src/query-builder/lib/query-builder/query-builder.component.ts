@@ -230,7 +230,6 @@ export class QueryBuilderComponent implements OnChanges, ControlValueAccessor, V
    * Needed when changing this.config after changing the value in the FormControl.
    */
   updateValidity(): void {
-    // tslint:disable-next-line:no-bitwise
     const ngControl = this.injector.get(NgControl, null, { self: true, optional: true });
     let formControl: UntypedFormControl;
     if (ngControl instanceof FormControlName) {

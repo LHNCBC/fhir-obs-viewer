@@ -106,7 +106,7 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
     // true or false. filterValues is extracted from this.filtersForm.
     this.dataSource.filterPredicate = ((data, filterValues) => {
       for (const [key, value] of Object.entries(filterValues)) {
-        if (!value || (value as string[]).length === 0) {
+        if (!value || (value as string | string[]).length === 0) {
           continue;
         }
         const columnDescription = this.columnDescriptions.find(
@@ -141,8 +141,7 @@ export class ResourceTableComponent implements OnInit, AfterContentInit, OnChang
       }
       return true;
       // casting method signature here because filterPredicate defines filter param as string
-      // tslint:disable-next-line:variable-name
-    }) as (BundleEntry, string) => boolean;
+    }) as (data: TableRow, filter: any) => boolean;
 
     this.subscriptions.push(
       this.filtersForm.valueChanges

@@ -69,8 +69,7 @@ export function csvStringToArray(csvString: string): string[][] | null {
   const re = /(,|\r?\n|\r|^)(?:"([^"]*(?:""[^"]*)*)"|([^,\r\n]*))/gi;
   const result = [[]];
   let lastIndex = 0;
-  let matches;
-  // tslint:disable-next-line:no-conditional-assignment
+  let matches: RegExpExecArray | null;
   while ((matches = re.exec(csvString))) {
     if (matches[1].length && matches[1] !== ',') {
       result.push([]);

@@ -127,7 +127,6 @@ export class FhirBackendService implements HttpBackend {
   isPreviousVersion = getUrlParam('prev-version') === 'enable';
 
   // Checkbox value of whether to use a SMART on FHIR client.
-  // tslint:disable-next-line:variable-name
   private _isSmartOnFhir = false;
   set isSmartOnFhir(value: boolean) {
     if (value) {

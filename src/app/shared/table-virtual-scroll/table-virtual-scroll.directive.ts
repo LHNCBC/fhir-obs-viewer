@@ -25,7 +25,6 @@ import { Subscription } from 'rxjs';
  * row recycling and makes the native scrollbar thumb and table content jump.
  */
 @Directive({
-  // tslint:disable-next-line:directive-selector
   selector: 'cdk-virtual-scroll-viewport[appTableVirtualScroll]',
   standalone: false,
   host: { style: 'overflow-anchor: none;' }
