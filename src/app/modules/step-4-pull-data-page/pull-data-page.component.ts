@@ -1,17 +1,17 @@
 import {
-  AfterViewInit,
+  ChangeDetectorRef,
   Component,
   Input,
   OnChanges,
   OnDestroy,
   SimpleChanges
 } from '@angular/core';
-import { map, shareReplay, startWith } from 'rxjs/operators';
+import { map } from 'rxjs/operators';
 import {
   ConnectionStatus,
   FhirBackendService
 } from '../../shared/fhir-backend/fhir-backend.service';
-import { Observable, Subscription } from 'rxjs';
+import { BehaviorSubject, Observable, Subscription } from 'rxjs';
 import {
   ColumnDescriptionsService
 } from '../../shared/column-descriptions/column-descriptions.service';
@@ -41,7 +41,7 @@ import { saveAs } from 'file-saver';
 // Use ECMAScript module distributions of csv-stringify package for our browser app.
 // See https://csv.js.org/stringify/distributions/browser_esm/
 import { stringify } from 'csv-stringify/browser/esm/sync';
-import { TableVirtualScrollDataSource } from 'ng-table-virtual-scroll';
+import { MatTableDataSource } from '@angular/material/table';
 import { MatTooltip } from '@angular/material/tooltip';
 import {
   AutocompleteParameterValue
@@ -59,14 +59,13 @@ import { Observation } from 'fhir/r4';
   selector: 'app-pull-data-page',
   templateUrl: './pull-data-page.component.html',
   styleUrls: [
-    './pull-data-page.component.less',
-    '../resource-table/resource-table.component.less'
+    './pull-data-page.component.less'
   ],
   standalone: false
 })
 export class PullDataPageComponent
   extends ResourceTableParentComponent
-  implements OnChanges, AfterViewInit, OnDestroy {
+  implements OnChanges, OnDestroy {
   MAX_PAGE_SIZE = MAX_PAGE_SIZE;
   // Default observation codes for the "Pull data for the cohort" step
   @Input()
@@ -77,6 +76,8 @@ export class PullDataPageComponent
   visibleResourceTypes: string[];
   // Array of not visible resource type names
   unselectedResourceTypes: string[];
+  // Index of the currently selected resource tab.
+  selectedTabIndex = 0;
   // Array of resource type names that has "code text" search parameter
   codeTextResourceTypes: string[] = [];
   // Subscription to the loading process
@@ -85,8 +86,10 @@ export class PullDataPageComponent
   changeCriteriaSubscription: Subscription;
 
   // This observable is used to avoid ExpressionChangedAfterItHasBeenCheckedError
-  // when the active tab changes
-  currentResourceType$: Observable<string>;
+  // when the active tab changes.
+  private currentResourceTypeSubject = new BehaviorSubject<string>('Observation');
+  currentResourceType$: Observable<string> = this.currentResourceTypeSubject
+    .asObservable();
 
   // Form controls of 'per patient' input
   perPatientFormControls: { [resourceType: string]: UntypedFormControl } = {};
@@ -104,8 +107,11 @@ export class PullDataPageComponent
 
   // Columns for the Variable-Patient table
   variablePatientTableColumns: string[] = [];
+  // Fixed row height (in pixels) used by the CDK virtual scroll viewport
+  // (See --mat-table-row-item-container-height).
+  readonly rowHeight = 52;
   // DataSource for the Variable-Patient table
-  variablePatientTableDataSource = new TableVirtualScrollDataSource<TableRow>(
+  variablePatientTableDataSource = new MatTableDataSource<TableRow>(
     []
   );
   // Whether the Observation table can be converted to Variable-Patient table.
@@ -119,7 +125,8 @@ export class PullDataPageComponent
     public cohort: CohortService,
     public pullData: PullDataService,
     private liveAnnouncer: LiveAnnouncer,
-    private settings: SettingsService
+    private settings: SettingsService,
+    private changeDetectorRef: ChangeDetectorRef
   ) {
     super();
     ['Observation', 'EvidenceVariable'].forEach((resourceType) => {
@@ -134,6 +141,8 @@ export class PullDataPageComponent
       .pipe(map((status) => status === ConnectionStatus.Ready))
       .subscribe((connected) => {
         this.visibleResourceTypes = ['Observation'];
+        this.selectedTabIndex = 0;
+        this.currentResourceTypeSubject.next(this.getCurrentResourceType());
         this.unselectedResourceTypes = [];
         if (connected) {
           const resources = fhirBackend.getCurrentDefinitions().resources;
@@ -216,20 +225,41 @@ export class PullDataPageComponent
    */
   getPluralFormOfResourceType = getPluralFormOfResourceType;
 
-  ngAfterViewInit(): void {
-    this.currentResourceType$ = this.tabGroup.selectedTabChange.pipe(
-      map(() => {
-        dispatchWindowResize();
-        return this.getCurrentResourceType();
-      }),
-      startWith(this.getCurrentResourceType()),
-      shareReplay({ bufferSize: 1, refCount: true })
-    );
-  }
-
   ngOnDestroy(): void {
     this.cancelAllLoads();
     this.changeCriteriaSubscription.unsubscribe();
+  }
+
+  /**
+   * Updates selected tab state and publishes the current resource type.
+   * @param index - Selected tab index.
+   */
+  selectTab(index: number): void {
+    this.selectedTabIndex = this.clampSelectedTabIndex(index);
+    this.currentResourceTypeSubject.next(this.getCurrentResourceType());
+    dispatchWindowResize();
+  }
+
+  /**
+   * Returns the resource type for the currently selected visible tab.
+   * @returns The selected tab's FHIR resource type.
+   */
+  override getCurrentResourceType(): string {
+    return this.visibleResourceTypes?.[this.clampSelectedTabIndex(
+      this.selectedTabIndex
+    )];
+  }
+
+  /**
+   * Keeps the selected tab index within the range of rendered resource tabs.
+   * @param index - Requested tab index.
+   * @returns A valid visible tab index, or `0` when no tabs are visible.
+   */
+  private clampSelectedTabIndex(index: number): number {
+    if (!this.visibleResourceTypes?.length) {
+      return 0;
+    }
+    return Math.max(0, Math.min(index, this.visibleResourceTypes.length - 1));
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -314,7 +344,11 @@ export class PullDataPageComponent
 
 
   /**
-   * Whether to show code selection after Load button.
+   * Determines whether the code selection control should be shown after the Load
+   * button for the specified resource type.
+   * @param resourceType - The FHIR resource type being rendered.
+   * @returns `true` when the code selection control should be shown; otherwise
+   * `false`.
    */
   showCodeSelection(resourceType: string): boolean {
     // TODO: waiting feedback from Clem whether we will show code selection for all
@@ -323,41 +357,60 @@ export class PullDataPageComponent
     // return this.codeTextResourceTypes.includes(resourceType);
   }
 
-  /**
-   * Adds tab for specified resource type.
-   */
-  addTab(resourceType: string): void {
-    this.unselectedResourceTypes.splice(
-      this.unselectedResourceTypes.indexOf(resourceType),
-      1
-    );
-    this.visibleResourceTypes.push(resourceType);
-    this.updateCodeFilterWithDefaults(resourceType);
-    setTimeout(() => {
-      this.tabGroup.selectedIndex = this.visibleResourceTypes.length - 1;
-    })
-  }
 
   /**
-   * Returns text for the remove tab button.
+   * Adds a new visible tab for the specified resource type and selects it.
+   * @param resourceType - The FHIR resource type to add as a visible tab.
+   */
+  addTab(resourceType: string): void {
+    const unselectedIndex = this.unselectedResourceTypes.indexOf(resourceType);
+    if (unselectedIndex === -1) {
+      return;
+    }
+    this.unselectedResourceTypes.splice(unselectedIndex, 1);
+    this.visibleResourceTypes.push(resourceType);
+    this.updateCodeFilterWithDefaults(resourceType);
+
+    // Render the new tab body while the current tab is still selected. If the
+    // selection changes in the same render pass that creates the tab, Material's
+    // dynamicHeight can keep the previous tab body's height for the new tab.
+    this.changeDetectorRef.detectChanges();
+
+    this.selectTab(this.visibleResourceTypes.length - 1);
+  }
+
+
+  /**
+   * Returns the label text for the button that removes a resource tab.
+   * @param resourceType - The FHIR resource type associated with the tab.
+   * @returns The remove-tab button text.
    */
   getRemoveTabButtonText(resourceType: string): string {
     return `Remove ${getPluralFormOfResourceType(resourceType)} tab`;
   }
 
+
   /**
-   * Removes tab for specified resource type.
+   * Removes the visible tab for the specified resource type and updates the
+   * selected tab index.
+   * @param resourceType - The FHIR resource type whose tab should be removed.
    */
   removeTab(resourceType: string): void {
+    const removeIndex = this.visibleResourceTypes.indexOf(resourceType);
+    if (removeIndex === -1) {
+      return;
+    }
     this.cancelLoadOf(resourceType);
     this.pullData.resetResourceData(resourceType);
     this.unselectedResourceTypes.push(resourceType);
     this.unselectedResourceTypes.sort();
-    const removeIndex = this.visibleResourceTypes.indexOf(resourceType);
-    if (removeIndex && removeIndex === this.tabGroup.selectedIndex) {
-      this.tabGroup.selectedIndex--;
-    }
     this.visibleResourceTypes.splice(removeIndex, 1);
+    const nextIndex = removeIndex < this.selectedTabIndex
+      ? this.selectedTabIndex - 1
+      : removeIndex === this.selectedTabIndex
+        ? removeIndex - 1
+        : this.selectedTabIndex;
+    this.selectTab(nextIndex);
   }
 
   /**
@@ -609,6 +662,9 @@ export class PullDataPageComponent
    */
   toggleFullscreen(): void {
     this.fullscreen = !this.fullscreen;
+    setTimeout(() => {
+      dispatchWindowResize();
+    }, 200);
   }
 
   /**

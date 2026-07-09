@@ -1,5 +1,5 @@
 import { AfterViewInit, Component, ViewChild } from '@angular/core';
-import pkg from '../../../../package.json';
+import { APP_VERSION } from '../../shared/app-version';
 import { removeUrlParam, setUrlParam } from '../../shared/utils';
 import { RasTokenService } from '../../shared/ras-token/ras-token.service';
 import { Step, StepperComponent } from '../stepper/stepper.component';
@@ -20,7 +20,7 @@ import {
   standalone: false
 })
 export class HomeComponent implements AfterViewInit {
-  version = pkg.version;
+  version = APP_VERSION;
   @ViewChild(StepperComponent) stepperComponent: StepperComponent;
 
   constructor(

@@ -6,13 +6,6 @@ mat-tab-group {
   margin: 16px;
 }
 
-.resource-table-container {
-  position: relative;
-  overflow: auto;
-  max-height: 300px;
-  margin-top: 16px;
-}
-
 :host ::ng-deep .mat-tab-disabled {
   color: unset;
 }
@@ -68,7 +61,7 @@ app-search-parameter-group {
   z-index: 101;
   background-color: white;
   .table-container {
-    height: 100vh;
+    height: calc(100vh - 10px);
   }
   .buttons-container {
     top: 0;
@@ -85,5 +78,83 @@ button.mini-fab-16 {
   mat-icon {
     width: 16px;
     height: 16px;
+  }
+}
+
+
+.container {
+  position: relative;
+}
+
+.table-container {
+  position: relative;
+  overflow: auto;
+}
+
+th.mat-mdc-header-cell:first-of-type,
+td.mat-mdc-cell:first-of-type,
+td.mat-mdc-footer-cell:first-of-type {
+  padding-left: 24px;
+}
+
+.mat-mdc-header-cell {
+  font-weight: bold;
+}
+
+.buttons-container {
+  position: absolute;
+  top: -50px;
+  right: 15px;
+  z-index: 100;
+  display: flex;
+  flex-direction: row;
+
+  & > button {
+    margin-left: 8px;
+  }
+}
+
+
+.table-container {
+  height: 474px;
+  margin-top: 0;
+
+  .mat-mdc-table {
+    table-layout: fixed;
+
+    th.mat-mdc-header-cell
+    {
+      height: 56px !important;
+      max-height: 56px !important;
+      line-height: 56px !important;
+      white-space: nowrap;
+
+      .h-box {
+        max-width: 400px;
+
+        app-ellipsis-text {
+          max-width: 100%
+        }
+      }
+    }
+    tr.mat-mdc-no-data-row {
+      td.mat-mdc-cell {
+        text-align: center;
+      }
+    }
+    td.mat-mdc-cell {
+      padding-top: 0;
+      padding-bottom: 0;
+      vertical-align: middle;
+      white-space: nowrap;
+
+      .h-box {
+        max-width: 400px;
+
+        app-ellipsis-text {
+          max-width: 100%
+        }
+      }
+    }
   }
 }

@@ -125,12 +125,11 @@
         <ng-container *ngTemplateOutlet="template; context: templateContext"></ng-container>
       </div>
     } @else {
-      <cdk-virtual-scroll-viewport tvsItemSize
+      <cdk-virtual-scroll-viewport appTableVirtualScroll [itemSize]="rowHeight"
         class="table-container"
         #viewport
         [class.table-container-with-prefix]="!!prefixTemplate"
-        [class.empty-table]="dataSource.data.length === 0"
-        (scroll)="onScroll()">
+        [class.empty-table]="dataSource.data.length === 0">
         <table mat-table matSort matSortDisableClear matSortStart='asc'
           [dataSource]="dataSource"
           [matSortActive]="sort?.active" [matSortDirection]="sort?.direction"
@@ -304,7 +303,7 @@
           aria-rowindex="1"></tr>
           <tr mat-row
             *matRowDef="let row; let i=index; columns: columns;"
-            [attr.aria-rowindex]="viewport.getRenderedRange().start + i + 2"
+            [attr.aria-rowindex]="i+2"
             [class.anchor-row]="isLastSelected(row)"
             [class.highlight]="highlightSelection && selectedResources.isSelected(row.resource)"
           (mousedown)="onRowMouseDown($event, row)"></tr>

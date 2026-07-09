@@ -15,7 +15,7 @@ import { LaunchModule } from './modules/launch/launch.module';
 import { AnnouncerModule } from './shared/announcer/announcer.module';
 import {
   MAT_TOOLTIP_DEFAULT_OPTIONS,
-  MAT_TOOLTIP_DEFAULT_OPTIONS_FACTORY
+  type MatTooltipDefaultOptions
 } from '@angular/material/tooltip';
 import {
   Oauth2TokenCallbackModule
@@ -36,8 +36,12 @@ const appearance: MatFormFieldDefaultOptions = {
   appearance: 'outline'
 };
 
-const myCustomTooltipDefaults = MAT_TOOLTIP_DEFAULT_OPTIONS_FACTORY();
-myCustomTooltipDefaults.disableTooltipInteractivity = true;
+const myCustomTooltipDefaults: MatTooltipDefaultOptions = {
+  showDelay: 0,
+  hideDelay: 0,
+  touchendHideDelay: 1500,
+  disableTooltipInteractivity: true
+};
 
 /**
  * Application initializer.

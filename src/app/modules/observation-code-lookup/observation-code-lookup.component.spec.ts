@@ -12,10 +12,14 @@ import { FhirBatchQuery } from '../../shared/fhir-backend/fhir-batch-query';
 import observations from './test-fixtures/observations.json';
 import observationsDuplicateDisplay
   from './test-fixtures/observations_duplicate_display.json';
-import { HttpTestingController } from '@angular/common/http/testing';
+import {
+  HttpTestingController,
+  provideHttpClientTesting
+} from '@angular/common/http/testing';
 import { CartService } from '../../shared/cart/cart.service';
 import {
   configureTestingModule,
+  flushSettingsRequests,
   verifyOutstandingRequests
 } from 'src/test/helpers';
 import { CohortService } from '../../shared/cohort/cohort.service';
@@ -58,18 +62,93 @@ describe('ObservationCodeLookupComponent', () => {
   let fixture: ComponentFixture<TestHostComponent>;
   let hostComponent: TestHostComponent;
   let component: ObservationCodeLookupComponent;
+  let mockHttp: HttpTestingController;
+  let lastnLookupSupported: boolean;
+  let requestedUrls: string[];
+
 
   /**
-   * Sends keydown event to specified input
+   * Flushes pending observation lookup requests.
+   * @param httpTestingController - HTTP testing controller.
+   * @param hasLastnLookup - whether the server supports $lastn lookup.
+   * @param urls - collection of requested URLs.
+   */
+  function flushObservationLookupRequests(
+    httpTestingController: HttpTestingController,
+    hasLastnLookup: boolean,
+    urls: string[]
+  ): void {
+    httpTestingController
+      .match((req) => req.url.startsWith('$fhir/Observation'))
+      .forEach((request) => {
+        const url = request.request.urlWithParams;
+        urls.push(url);
+        const response = !hasLastnLookup &&
+          /code:text/.test(url) &&
+          !/code:not/.test(url)
+          ? {
+            ...observations,
+            link: [
+              {
+                relation: 'next',
+                url: 'someUrl'
+              }
+            ]
+          }
+          : observations;
+        request.flush(
+          /Duplicate/i.test(url) ? observationsDuplicateDisplay : response
+        );
+      });
+  }
+
+  /**
+   * Sends keydown event to specified input.
+   * @param input - autocomplete input element.
+   * @param keyCode - keyboard event key code.
+   * @param httpTestingController - HTTP testing controller.
+   * @param hasLastnLookup - whether the server supports $lastn lookup.
+   * @param urls - collection of requested URLs.
+   * @returns promise that resolves after autocomplete async handlers run.
    */
   function keyDownInAutocompleteInput(
     input: HTMLInputElement,
-    keyCode: number
+    keyCode: number,
+    httpTestingController: HttpTestingController,
+    hasLastnLookup: boolean,
+    urls: string[]
   ): Promise<void> {
-    // @ts-ignore keyCode is deprecated, but autocomplete-lhc uses this property
-    input.dispatchEvent(new KeyboardEvent('keydown', { keyCode }));
+    const event = {
+      altKey: false,
+      ctrlKey: false,
+      keyCode,
+      metaKey: false,
+      preventDefault: () => {},
+      stopImmediatePropagation: () => {}
+    };
+    const autocomplete = (input as any).autocomp;
+    if (autocomplete.active || keyCode === 13) {
+      autocomplete.onKeyPress(event);
+    } else {
+      autocomplete.hasFocus = true;
+      autocomplete.onObserverEvent();
+    }
     // Let autocompleter and ObservationCodeLookupComponent to react on keydown event
     return new Promise((resolve) => {
+      setTimeout(() => {
+        flushObservationLookupRequests(
+          httpTestingController,
+          hasLastnLookup,
+          urls
+        );
+      }, 250);
+      setTimeout(() => {
+        flushObservationLookupRequests(
+          httpTestingController,
+          hasLastnLookup,
+          urls
+        );
+      }, 350);
       setTimeout(() => resolve(), 500);
     });
   }
@@ -137,6 +216,9 @@ describe('ObservationCodeLookupComponent', () => {
             MatFormFieldModule,
             ObservationCodeLookupModule,
             SharedModule
+          ],
+          providers: [
+            provideHttpClientTesting()
           ]
         }).compileComponents();
       });
@@ -146,6 +228,9 @@ describe('ObservationCodeLookupComponent', () => {
         spyOn(FhirBatchQuery.prototype, 'initialize').and.resolveTo(null);
         const fhirBackend = TestBed.inject(FhirBackendService);
         const settingsService = TestBed.inject(SettingsService);
+        mockHttp = TestBed.inject(HttpTestingController);
+        lastnLookupSupported = !description.includes('not supported');
+        requestedUrls = [];
         spyOnProperty(fhirBackend, 'currentVersion').and.returnValue('R4');
         spyOnProperty(fhirBackend, 'features').and.returnValue({
           isFormatSupported: true,
@@ -176,6 +261,7 @@ describe('ObservationCodeLookupComponent', () => {
         settingsService.loadJsonConfig().subscribe(() => {
           fhirBackend.init();
         });
+        await flushSettingsRequests(mockHttp);
         await fhirBackend.initialized
           .pipe(
             filter((status) => status === ConnectionStatus.Ready),
@@ -212,18 +298,32 @@ describe('ObservationCodeLookupComponent', () => {
         const ARROW_DOWN = 40;
         const ENTER = 13;
         input.focus();
-        await keyDownInAutocompleteInput(input, ARROW_DOWN);
+        await keyDownInAutocompleteInput(
+          input,
+          ARROW_DOWN,
+          mockHttp,
+          lastnLookupSupported,
+          requestedUrls
+        );
         // Check if autocompleter displays the dropdown list
         expect(
-          (document.querySelector('#searchResults') as HTMLElement).style
+          (document.querySelector('#lhc-tools-searchResults') as HTMLElement).style
             .visibility
         ).toBe('visible');
-        await keyDownInAutocompleteInput(input, ARROW_DOWN);
-        await keyDownInAutocompleteInput(input, ENTER);
-
-        const requestedUrls = FhirBatchQuery.prototype.getWithCache.calls
-          .allArgs()
-          .map((params) => params[0]);
+        await keyDownInAutocompleteInput(
+          input,
+          ARROW_DOWN,
+          mockHttp,
+          lastnLookupSupported,
+          requestedUrls
+        );
+        await keyDownInAutocompleteInput(
+          input,
+          ENTER,
+          mockHttp,
+          lastnLookupSupported,
+          requestedUrls
+        );
 
         // use "code:not" when $last is not used
         expect(requestedUrls).toContain(
@@ -259,18 +359,60 @@ describe('ObservationCodeLookupComponent', () => {
         const ARROW_DOWN = 40;
         const ENTER = 13;
         input.focus();
-        await keyDownInAutocompleteInput(input, ARROW_DOWN);
+        await keyDownInAutocompleteInput(
+          input,
+          ARROW_DOWN,
+          mockHttp,
+          lastnLookupSupported,
+          requestedUrls
+        );
         // Check if autocompleter displays the dropdown list
         expect(
-          (document.querySelector('#searchResults') as HTMLElement).style
+          (document.querySelector('#lhc-tools-searchResults') as HTMLElement).style
             .visibility
         ).toBe('visible');
-        await keyDownInAutocompleteInput(input, ARROW_DOWN);
-        await keyDownInAutocompleteInput(input, ENTER);
-        await keyDownInAutocompleteInput(input, ARROW_DOWN);
-        await keyDownInAutocompleteInput(input, ENTER);
-        await keyDownInAutocompleteInput(input, ARROW_DOWN);
-        await keyDownInAutocompleteInput(input, ENTER);
+        await keyDownInAutocompleteInput(
+          input,
+          ARROW_DOWN,
+          mockHttp,
+          lastnLookupSupported,
+          requestedUrls
+        );
+        await keyDownInAutocompleteInput(
+          input,
+          ENTER,
+          mockHttp,
+          lastnLookupSupported,
+          requestedUrls
+        );
+        await keyDownInAutocompleteInput(
+          input,
+          ARROW_DOWN,
+          mockHttp,
+          lastnLookupSupported,
+          requestedUrls
+        );
+        await keyDownInAutocompleteInput(
+          input,
+          ENTER,
+          mockHttp,
+          lastnLookupSupported,
+          requestedUrls
+        );
+        await keyDownInAutocompleteInput(
+          input,
+          ARROW_DOWN,
+          mockHttp,
+          lastnLookupSupported,
+          requestedUrls
+        );
+        await keyDownInAutocompleteInput(
+          input,
+          ENTER,
+          mockHttp,
+          lastnLookupSupported,
+          requestedUrls
+        );
 
         expect(hostComponent.selectedObservationCodes.value.coding.length).toBe(
           3

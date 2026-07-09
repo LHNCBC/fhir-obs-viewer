@@ -6,6 +6,7 @@ import { Component, ViewChild } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { MatTooltip } from '@angular/material/tooltip';
 
+
 @Component({
   template: ` <div style="width: 100px">
     <app-ellipsis-text [text]="text"></app-ellipsis-text>
@@ -17,6 +18,7 @@ class TestHostComponent {
   text = '';
 }
 
+
 describe('EllipsisTextComponent', () => {
   let hostComponent: TestHostComponent;
   let component: EllipsisTextComponent;
@@ -26,12 +28,14 @@ describe('EllipsisTextComponent', () => {
   const LONG_TEXT = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   const SHORT_TEXT = 'aaa';
 
+
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       declarations: [TestHostComponent],
       imports: [EllipsisTextModule]
     }).compileComponents();
   });
+
 
   beforeEach(() => {
     fixture = TestBed.createComponent(TestHostComponent);
@@ -41,33 +45,51 @@ describe('EllipsisTextComponent', () => {
     spyOn(component, 'getTooltipText').and.callThrough();
     div = fixture.nativeElement.querySelector('app-ellipsis-text div');
     tooltip = fixture.debugElement
-      .query(By.css('app-ellipsis-text div div'))
+      .query(By.directive(MatTooltip))
       .injector.get(MatTooltip);
   });
+
 
   it('should create', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should set tooltip for long text', () => {
-    hostComponent.text = LONG_TEXT;
+
+  /**
+   * Sets the host component text, triggers change detection, simulates hovering
+   * over the ellipsis text element, and verifies that the tooltip message matches
+   * the expected value.
+   *
+   * @param text - The text value to render in the ellipsis text component.
+   * @param expectedTooltipText - The tooltip text expected after mouse hover.
+   */
+  function expectTooltipText(text: string, expectedTooltipText: string): void {
+    hostComponent.text = text;
+    fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();
+    spyOn(div, 'getBoundingClientRect').and.returnValue({
+      right: 100
+    } as DOMRect);
+    spyOn(div.querySelector('span'), 'getBoundingClientRect').and.returnValue({
+      right: expectedTooltipText ? 120 : 80
+    } as DOMRect);
     expect(component.getTooltipText).not.toHaveBeenCalled();
     expect(tooltip.message).toBe('');
-    const event = new Event('mouseenter');
-    div.dispatchEvent(event);
+
+    div.dispatchEvent(new Event('mouseenter'));
+
     expect(component.getTooltipText).toHaveBeenCalled();
-    expect(tooltip.message).toBe(LONG_TEXT);
+    expect(tooltip.message).toBe(expectedTooltipText);
+  }
+
+
+  it('should set tooltip for long text', () => {
+    expectTooltipText(LONG_TEXT, LONG_TEXT);
   });
 
+
   it('should not set tooltip for short text', () => {
-    hostComponent.text = SHORT_TEXT;
-    fixture.detectChanges();
-    expect(component.getTooltipText).not.toHaveBeenCalled();
-    expect(tooltip.message).toBe('');
-    const event = new Event('mouseenter');
-    div.dispatchEvent(event);
-    expect(component.getTooltipText).toHaveBeenCalled();
-    expect(tooltip.message).toBe('');
+    expectTooltipText(SHORT_TEXT, '');
   });
+
 });

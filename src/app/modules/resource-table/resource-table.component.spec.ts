@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
 import { ResourceTableComponent } from './resource-table.component';
 import { of } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
@@ -255,7 +255,6 @@ describe('ResourceTableComponent', () => {
     expect(component.filtersForm.get('id')).not.toBeNull();
     expect(component.dataSource.filteredData.length).toEqual(50);
     component.filtersForm.get('id').setValue('49');
-    fixture.detectChanges();
     expect(component.dataSource.filteredData.length).toEqual(1);
   });
 
@@ -295,7 +294,6 @@ describe('ResourceTableComponent', () => {
     expect(component.filtersForm.get('customElement')).not.toBeNull();
     expect(component.dataSource.filteredData.length).toEqual(50);
     component.filtersForm.get('customElement').setValue('>=49');
-    fixture.detectChanges();
     expect(component.dataSource.filteredData.length).toEqual(2);
   });
 
@@ -305,7 +303,6 @@ describe('ResourceTableComponent', () => {
     expect(component.filtersForm.get('customElement')).not.toBeNull();
     expect(component.dataSource.filteredData.length).toEqual(50);
     component.filtersForm.get('customElement').setValue('<49');
-    fixture.detectChanges();
     expect(component.dataSource.filteredData.length).toEqual(48);
   });
 
@@ -315,7 +312,6 @@ describe('ResourceTableComponent', () => {
     expect(component.filtersForm.get('customElement')).not.toBeNull();
     expect(component.dataSource.filteredData.length).toEqual(50);
     component.filtersForm.get('customElement').setValue('40 - 49');
-    fixture.detectChanges();
     expect(component.dataSource.filteredData.length).toEqual(10);
   });
 
@@ -348,17 +344,18 @@ describe('ResourceTableComponent', () => {
     expect(index12 < index9).toBeTrue();
   });
 
-  it('should show message when no records match filter', () => {
+  it('should show message when no records match filter', fakeAsync(() => {
     fillTableWithSomeResources(someResourceColumns);
     expect(component.filtersForm).not.toBeNull();
     expect(component.filtersForm.get('id')).not.toBeNull();
     expect(component.dataSource.filteredData.length).toEqual(50);
     expect(page.clearFiltersLink).toBeNull();
     component.filtersForm.get('id').setValue('51');
-    fixture.detectChanges();
+    tick();
+    fixture.detectChanges(false);
     expect(component.dataSource.filteredData.length).toEqual(0);
     expect(page.clearFiltersLink).not.toBeNull();
-  });
+  }));
 
   it('should split column of values into columns of values and units in export', async () => {
     fillTableWithObservationResources(observationColumns);

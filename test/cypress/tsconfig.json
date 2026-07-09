@@ -1,8 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "include": [
-    "**/*.ts",
-    "../../node_modules/@types/jasmine/index.d.ts"
+    "**/*.ts"
   ],
   "compilerOptions": {
     "sourceMap": true,

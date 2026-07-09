@@ -33,7 +33,6 @@ import { MatDialogModule } from "@angular/material/dialog";
   template: '',
   standalone: false
 })
-// tslint:disable-next-line:component-class-suffix
 class SelectAnAreaOfInterestComponentStub {
   option = { value: SelectOptions.showOnlyStudiesWithSubjects };
   SelectOptions = SelectOptions;
@@ -45,7 +44,6 @@ class SelectAnAreaOfInterestComponentStub {
   template: '',
   standalone: false
 })
-// tslint:disable-next-line:component-class-suffix
 class SelectAnActionComponentStub {
   createCohortMode = new UntypedFormControl(CreateCohortMode.UNSELECTED);
 }
@@ -55,7 +53,6 @@ class SelectAnActionComponentStub {
   template: '',
   standalone: false
 })
-// tslint:disable-next-line:component-class-suffix
 class SettingsPageComponentStub {
   settingsFormGroup = new UntypedFormBuilder().group({});
 }
@@ -65,7 +62,6 @@ class SettingsPageComponentStub {
   template: '',
   standalone: false
 })
-// tslint:disable-next-line:component-class-suffix
 class DefineCohortPageComponentStub {
   defineCohortForm = new UntypedFormBuilder().group({
     maxNumberOfPatients: ['100', Validators.required]

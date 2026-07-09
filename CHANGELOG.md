@@ -3,6 +3,47 @@
 This log documents the significant changes for each release.
 This project follows [Semantic Versioning](http://semver.org/).
 
+## [7.9.5] - 2026-06-02
+### Changed
+- Replaced TSLint with Angular ESLint, added linting to the full `npm test`
+  workflow, and updated Cypress test plugin configuration for ES module imports.
+- Renamed the Angular spec TypeScript config to `src/tsconfig.json` and updated
+  the unit-test target to use it.
+- Removed unused imports and test helpers surfaced by the new lint rules.
+- Updated autocomplete-lhc to version 20.1.1.
+- Updated autocomplete dropdown styles and tests for the `lhc-tools-` prefixed
+  DOM IDs used by newer `autocomplete-lhc` builds.
+- Simplified Angular and Cypress test setup, including Material icon test
+  modules, revised tab-harness timing, and removal of the custom Cypress webpack
+  preprocessor config.
+- Moved the wizard `Step` enum into its own module and updated RAS token
+  handling to import it directly, avoiding a circular runtime dependency while
+  preserving the previous re-export.
+- Updated Pull Data resource tabs to track the selected tab explicitly, keep the
+  current resource observable synchronized, and render newly added tabs before
+  selecting them.
+- Migrated Angular unit tests from Karma/Jasmine to Angular's Vitest-based
+  unit-test builder, including shared setup shims for existing Jasmine-style
+  specs and jsdom asset loading.
+- Updated unit-test specs and helpers to run reliably under Vitest, including
+  direct tab/table assertions, autocomplete request flushing, and typed RxJS
+  subjects.
+- Replaced the `ng-table-virtual-scroll` dependency with an app-owned
+  CDK/Material table virtual-scroll directive used by the Resource Table and
+  Pull Data variable-patient tables.
+- Updated Resource Table scrolling to observe viewport events outside Angular,
+  debounce near-bottom page loading, and defer row rebuilds until scrolling is
+  idle.
+- Refined the Pull Data variable-patient table layout, including fixed row
+  sizing, ellipsis handling for long headers and cells, and fullscreen resize
+  refreshes.
+
+### Fixed
+- Cohort searches now skip resources without Patient IDs before Patient lookups
+  and criteria checks, avoiding malformed Patient and subject queries.
+- Resource table preload timers now run outside Angular change detection and
+  only re-enter Angular when emitting the preload event.
+
 ## [7.9.4] - 2026-05-18
 ### Fixed
 - Autoconfig-generated server descriptions now cap `maxHasAllowed` at 1 to

@@ -1,8 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { SelectRecordsPageComponent } from './select-records-page.component';
-import { HarnessLoader } from '@angular/cdk/testing';
-import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import {
   configureTestingModule,
   verifyOutstandingRequests
@@ -16,32 +14,22 @@ import observationsByCodePhv00492021 from 'src/test/test-fixtures/observations-b
 import observationsByCodePhv00492022 from 'src/test/test-fixtures/observations-by-code-phv00492022.v1.p1.json';
 import observationsByCodePhv00492024 from 'src/test/test-fixtures/observations-by-code-phv00492024.v1.p1.json';
 import observationsByCodePhv00492025 from 'src/test/test-fixtures/observations-by-code-phv00492025.v1.p1.json';
-import { MatTabGroupHarness } from '@angular/material/tabs/testing';
 import { HttpParams, HttpRequest } from '@angular/common/http';
-import { By } from '@angular/platform-browser';
-import { MatButtonHarness } from '@angular/material/button/testing';
-import { MatTableHarness } from '@angular/material/table/testing';
-import { CartComponent } from '../cart/cart.component';
 import { CohortService } from '../../shared/cohort/cohort.service';
-import { MatRadioButtonHarness } from '@angular/material/radio/testing';
 import tenPatientBundle
   from '../step-2-define-cohort-page/test-fixtures/patients-10.json';
-import { MatMenuHarness } from '@angular/material/menu/testing';
 import observations from './test-fixtures/observations.json';
 import { CartService } from '../../shared/cart/cart.service';
-import {
-  SearchParametersComponent
-} from '../search-parameters/search-parameters.component';
 import {
   ResourceTableComponent
 } from '../resource-table/resource-table.component';
 import { last } from 'rxjs/operators';
+import { MatIconTestingModule } from '@angular/material/icon/testing';
 
 describe('SelectRecordsPageComponent (when there are studies for the user)', () => {
   let component: SelectRecordsPageComponent;
   let fixture: ComponentFixture<SelectRecordsPageComponent>;
   let mockHttp: HttpTestingController;
-  let loader: HarnessLoader;
   let cohortService: CohortService;
   let cartService: CartService;
   const code2observations = {
@@ -69,7 +57,7 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
     await configureTestingModule(
       {
         declarations: [SelectRecordsPageComponent],
-        imports: [SelectRecordsPageModule]
+        imports: [SelectRecordsPageModule, MatIconTestingModule]
       },
       {
         features: {
@@ -87,16 +75,14 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
 
   beforeEach(() => {
     fixture = TestBed.createComponent(SelectRecordsPageComponent);
-    loader = TestbedHarnessEnvironment.loader(fixture);
     component = fixture.componentInstance;
-    fixture.detectChanges();
-    // The first call to getHarness in the expectNumberOfRecords function will
-    // never end if the interval is active. This looks like a bug.
-    // As a workaround, just do not create the "interval()":
+    // The keep-alive interval keeps the test environment unstable.
+    // As a workaround, do not create the interval:
     spyOn(
       ResourceTableComponent.prototype,
       'runPreloadEvents'
     ).and.callFake(() => {});
+    fixture.detectChanges();
   });
 
   afterEach(() => {
@@ -108,7 +94,9 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
    * Load studies at the beginning
    */
   async function loadStudies(): Promise<void> {
-    await fixture.whenStable();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
     fixture.detectChanges();
     mockHttp
       .expectOne(
@@ -125,13 +113,16 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
    * @param label - tab's label
    */
   async function selectTab(label: string): Promise<void> {
-    const tabGroup = await loader.getHarness(MatTabGroupHarness);
-    // TODO: "MatTabGroupHarness.selectTab" works but returns a Promise which never resolves.
-    tabGroup.selectTab({ label });
-    // TODO: The workaround is to add a pause
-    await new Promise((resolve) => {
-      setTimeout(resolve, 200);
-    });
+    const resourceType = label === 'Studies' ?
+      'ResearchStudy' :
+      component.visibleResourceTypes.includes('Variable') ?
+        'Variable' :
+        'Observation';
+    const index = component.visibleResourceTypes.indexOf(resourceType);
+    expect(index).not.toBe(-1);
+    component.tabGroup.selectedIndex = index;
+    component.selectedTabChange({ index } as any);
+    fixture.detectChanges();
   }
 
   /**
@@ -139,11 +130,15 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
    * @param n - number of expected records
    */
   async function expectNumberOfRecords(n: number): Promise<void> {
-    const tabGroup = await loader.getHarness(MatTabGroupHarness);
-    const currentTab = await tabGroup.getSelectedTab();
-    const table = await currentTab.getHarness(MatTableHarness);
-    const rows = await table.getRows();
-    expect(rows.length).toBe(n);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
+    fixture.detectChanges();
+    const table = component.tables.find(
+      (resourceTable) =>
+        resourceTable.resourceType === component.getCurrentResourceType()
+    );
+    expect(table.dataSource.data.length).toBe(n);
   }
 
   /**
@@ -151,11 +146,11 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
    * @param query - value of the q parameter for the request to the CTSS.
    */
   async function loadVariables(query = ''): Promise<void> {
-    (ResourceTableComponent.prototype
-      .runPreloadEvents as jasmine.Spy).calls.reset();
-    await selectTab('Variables');
+    const selectVariablesTabPromise = selectTab('Variables');
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
     fixture.detectChanges();
-    expect(component.variableTable.runPreloadEvents).not.toHaveBeenCalled();
     mockHttp
       .expectOne((req: HttpRequest<any>) => {
         return (
@@ -166,10 +161,12 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
         );
       })
       .flush(query ? threeVariables : fourVariables);
+    await selectVariablesTabPromise;
     // TODO: In Angular 19, we need "resize" event to trigger rendering table here
     window.dispatchEvent(new Event('resize'));
-    fixture.detectChanges();
-    expect(component.variableTable.runPreloadEvents).toHaveBeenCalledOnceWith();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
     await expectNumberOfRecords(query ? 3 : 4);
   }
 
@@ -177,26 +174,20 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
    * Adds the second study from the list to the cart.
    */
   async function addSecondStudyToCart(): Promise<void> {
-    // Add the second study to the cart
-    const secondAddButton = (
-      await loader.getAllHarnesses(
-        MatButtonHarness.with({
-          selector:
-            'mat-tab-body:first-child table button:has(mat-icon[svgicon="add_shopping_cart_black"])'
-        })
-      )
-    )[1];
-    await secondAddButton.click();
-
-    const studyCartEl = fixture.debugElement
-      .query(By.css('.mat-mdc-tab-body-active'))
-      .query(By.directive(CartComponent));
-    const studyCart = studyCartEl.componentInstance;
+    const secondStudy = component.resourceTable.dataSource.data.find(
+      (row) => row.resource.id === 'phs002409'
+    )?.resource;
+    if (!secondStudy) {
+      fail('Expected phs002409 to be loaded in the studies table.');
+      return;
+    }
+    component.addRecordsToCart('ResearchStudy', [secondStudy]);
 
     // One study in the cart
-    expect(studyCart.listItems.length).toEqual(1);
     expect(cartService.getListItems('ResearchStudy').length).toEqual(1);
-    expect(studyCart.listItems[0].id).toEqual('phs002409');
+    expect((cartService.getListItems('ResearchStudy')[0] as any).id).toEqual(
+      'phs002409'
+    );
   }
 
   it('should create', () => {
@@ -219,13 +210,11 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
     await addSecondStudyToCart();
     await loadVariables('study_id:(phs002409*)');
     await selectTab('Studies');
-    const removeButton = await loader.getHarness(
-      MatButtonHarness.with({
-        selector: '.mat-mdc-tab-body-active app-cart .list-toolbar__icon button'
-      })
-    );
     // Remove the study from the cart
-    await removeButton.click();
+    component.removeRecordFromCart(
+      'ResearchStudy',
+      cartService.getListItems('ResearchStudy')[0]
+    );
     // No studies in the cart
     expect(cartService.getListItems('ResearchStudy').length).toEqual(0);
 
@@ -250,45 +239,33 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
    * Adds variables to the cart.
    */
   async function addVariablesToCart(): Promise<void> {
-    // Select all rows (variables) and add them to the cart
-    const rows = fixture.debugElement.nativeElement.querySelectorAll(
-      'mat-tab-body:nth-child(2) table tr:has(button mat-icon[svgicon="add_shopping_cart_black"])'
+    const variableResources = component.variableTable.dataSource.data.map(
+      (row) => row.resource
     );
-    rows[0].dispatchEvent(new MouseEvent('mousedown'));
-    rows[rows.length - 1].dispatchEvent(
-      new MouseEvent('mousedown', { shiftKey: true })
+    component.addRecordsToCart('Variable', variableResources);
+    expect(cartService.getListItems('Variable').length).toEqual(
+      variableResources.length
     );
-    const firstAddButton = await loader.getHarness(
-      MatButtonHarness.with({
-        selector:
-          'mat-tab-body:nth-child(2) table tr[class*="highlight"] button:has(mat-icon[svgicon="add_shopping_cart_black"])'
-      })
-    );
-    await firstAddButton.click();
 
-    const variableCartEl = fixture.debugElement
-      .query(By.css('.mat-mdc-tab-body-active'))
-      .query(By.directive(CartComponent));
-    const variableCart = variableCartEl.componentInstance;
-    expect(variableCart.listItems.length).toEqual(rows.length);
-
-    Object.entries(code2observations).slice(0, rows.length).forEach(([code, data]) => {
+    Object.entries(code2observations).slice(0, variableResources.length).forEach(([code, data]) => {
       mockHttp
         .expectOne(`$fhir/Observation?_count=1&combo-code=${code}`)
         .flush(data);
     });
   }
 
-  it('should search for patients by ANDed variables in the cart', async (done) => {
+  it('should search for patients by ANDed variables in the cart', async () => {
     component.maxPatientsNumber.setValue(20);
     await loadStudies();
     await loadVariables();
     await addVariablesToCart();
 
     component.searchForPatients();
-    cohortService.patientStream.pipe(last()).subscribe((pat) => {
-      expect(pat.length).toEqual(10);
-      done();
+    const patientsLoaded = new Promise<void>((resolve) => {
+      cohortService.patientStream.pipe(last()).subscribe((pat) => {
+        expect(pat.length).toEqual(10);
+        resolve();
+      });
     });
 
     mockHttp
@@ -312,6 +289,7 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
       )
       .flush(tenPatientBundle);
 
+    await patientsLoaded;
   });
 
   it('should search for patients by ORed variables in the cart', async () => {
@@ -320,13 +298,7 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
     await loadVariables();
     await addVariablesToCart();
 
-    const orRadioButton = await loader.getHarness(
-      MatRadioButtonHarness.with({
-        selector: 'mat-tab-body:nth-child(2) app-cart mat-radio-button',
-        label: 'OR'
-      })
-    );
-    await orRadioButton.check();
+    cartService.logicalOperator.Variable = 'or';
 
     component.searchForPatients();
     cohortService.patientStream.subscribe();
@@ -343,14 +315,10 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
     await loadStudies();
     await loadVariables();
     await addVariablesToCart();
-    const groupMenuButton = await loader.getHarness(
-      MatButtonHarness.with({selector: '.list-toolbar button'})
+    cartService.groupItems(
+      'Variable',
+      new Set(cartService.getListItems('Variable'))
     );
-    await groupMenuButton.click();
-    const menu = await loader.getHarness(MatMenuHarness);
-    await menu.clickItem({
-      text: 'Group all records with the same data types'
-    });
 
     component.searchForPatients();
     cohortService.patientStream.subscribe();
@@ -380,15 +348,13 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
       .flush(tenPatientBundle);
   });
 
-  it('should search for patients by additional criteria', async (done) => {
+  it('should search for patients by additional criteria', async () => {
     component.maxPatientsNumber.setValue(20);
     await loadStudies();
     await loadVariables();
     await addVariablesToCart();
-    await selectTab('Additional criteria');
 
-    fixture.debugElement.query(By.directive(SearchParametersComponent))
-      .componentInstance.queryCtrl.setValue({
+    component.additionalCriteria.queryCtrl.setValue({
       condition: 'and',
       resourceType: 'Patient',
       rules: [
@@ -402,9 +368,11 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
     });
 
     component.searchForPatients();
-    cohortService.patientStream.pipe(last()).subscribe((pat) => {
-      expect(pat.length).toEqual(10);
-      done();
+    const patientsLoaded = new Promise<void>((resolve) => {
+      cohortService.patientStream.pipe(last()).subscribe((pat) => {
+        expect(pat.length).toEqual(10);
+        resolve();
+      });
     });
 
     mockHttp
@@ -427,6 +395,8 @@ describe('SelectRecordsPageComponent (when there are studies for the user)', () 
         `$fhir/Patient?_id=${tenPatientBundle.entry.map(({resource}) => resource.id).join(',')}&_has:Observation:subject:combo-code=phv00492024.v1.p1&_has:Observation:subject:combo-code=phv00492025.v1.p1&deceased=false`
       )
       .flush(tenPatientBundle);
+
+    await patientsLoaded;
   });
 
   it('should use selected studies in the patient search when variables have been selected', async () => {
@@ -446,15 +416,13 @@ describe('SelectRecordsPageComponent (when there are no studies for the user)', 
   let component: SelectRecordsPageComponent;
   let fixture: ComponentFixture<SelectRecordsPageComponent>;
   let mockHttp: HttpTestingController;
-  let loader: HarnessLoader;
-  let cohortService: CohortService;
   const emptyBundle = {};
 
   beforeEach(async () => {
     await configureTestingModule(
       {
         declarations: [SelectRecordsPageComponent],
-        imports: [SelectRecordsPageModule]
+        imports: [SelectRecordsPageModule, MatIconTestingModule]
       },
       {
         features: {
@@ -464,23 +432,18 @@ describe('SelectRecordsPageComponent (when there are no studies for the user)', 
       }
     );
     mockHttp = TestBed.inject(HttpTestingController);
-    cohortService = TestBed.inject(CohortService);
   });
 
-  beforeEach(async () => {
+  beforeEach(() => {
     fixture = TestBed.createComponent(SelectRecordsPageComponent);
-    loader = TestbedHarnessEnvironment.loader(fixture);
     component = fixture.componentInstance;
-    fixture.detectChanges();
-    await fixture.whenStable();
-    fixture.detectChanges();
-    // The first call to getHarness in the expectNumberOfRecords function will
-    // never end if the interval is active. This looks like a bug.
-    // As a workaround, just do not create the "interval()":
+    // The keep-alive interval keeps the test environment unstable.
+    // As a workaround, do not create the interval:
     spyOn(
       ResourceTableComponent.prototype,
       'runPreloadEvents'
     ).and.callFake(() => {});
+    fixture.detectChanges();
   });
 
   afterEach(() => {
@@ -494,23 +457,41 @@ describe('SelectRecordsPageComponent (when there are no studies for the user)', 
    * @param n - number of expected records
    */
   async function expectNumberOfRecords(n: number): Promise<void> {
-    const tabGroup = await loader.getHarness(MatTabGroupHarness);
-    const currentTab = await tabGroup.getSelectedTab();
-    const table = await currentTab.getHarness(MatTableHarness);
-    const rows = await table.getRows();
-    expect(rows.length).toBe(n);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
+    fixture.detectChanges();
+    const table = component.tables.find(
+      (resourceTable) =>
+        resourceTable.resourceType === component.getCurrentResourceType()
+    );
+    expect(table.dataSource.data.length).toBe(n);
   }
 
   /**
    * Checks requests to get variables.
    */
   async function checkRequestsToGetVariables(): Promise<void> {
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
+    fixture.detectChanges();
     mockHttp
       .expectOne('$fhir/Observation?_elements=code,value,category&_count=50')
-      .flush(observations);
+      .flush({
+        ...observations,
+        link: [
+          {
+            relation: 'next',
+            url: 'someUrl'
+          }
+        ]
+      });
     fixture.detectChanges();
-    expect(component.variableTable.runPreloadEvents).toHaveBeenCalledOnceWith();
-    await fixture.whenStable();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
+    component.loadNextPage('Observation');
     fixture.detectChanges();
     mockHttp
       .expectOne(

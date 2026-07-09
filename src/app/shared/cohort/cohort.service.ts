@@ -199,55 +199,59 @@ export class CohortService {
           : EMPTY;
       }),
       // Expand each array of resources into separate resources
-      concatMap((resources) => {
-        resources = resources
-          // Skip already processed Patients
-          .filter((resource) => {
-            const patientId = this.getPatientIdFromResource(resource);
-            if (currentState.processedPatientIds[patientId]) {
-              // Update the number of resources in processing
-              currentState.numberOfProcessingResources$.next(
-                currentState.numberOfProcessingResources$.value - 1
-              );
-              return false;
-            }
-            currentState.processedPatientIds[patientId] = true;
-            return true;
-          });
-        if (currentState.patients.length + resources.length > maxPatientCount) {
-          resources.length = maxPatientCount - currentState.patients.length;
+      concatMap((resources: Resource[]) => {
+        // Skip already processed Patients or resources without a Patient ID,
+        // decrementing the in-processing counter for each skipped resource.
+        resources = resources.filter((resource) => {
+          const patientId = this.getPatientIdFromResource(resource);
+          if (!patientId || currentState.processedPatientIds[patientId]) {
+            currentState.numberOfProcessingResources$.next(
+              currentState.numberOfProcessingResources$.value - 1
+            );
+            return false;
+          }
+          currentState.processedPatientIds[patientId] = true;
+          return true;
+        });
+
+        // Cap the batch so we never exceed maxPatientCount.
+        const remaining = maxPatientCount - currentState.patients.length;
+        if (resources.length > remaining) {
+          resources.length = remaining;
         }
 
-        // Split the list of resources into patients and others
-        const {patients, otherResources} = resources.reduce((acc, resource) => {
-          (resource.resourceType === PATIENT_RESOURCE_TYPE ? acc.patients : acc.otherResources)
-            .push(resource);
-          return acc;
-        }, {patients: [], otherResources: []});
+        // Separate Patient resources from related resources.
+        const patients: Patient[] = [];
+        const otherPatientIds: string[] = [];
+        for (const resource of resources) {
+          if (resource.resourceType === PATIENT_RESOURCE_TYPE) {
+            patients.push(resource as Patient);
+          } else {
+            otherPatientIds.push(this.getPatientIdFromResource(resource));
+          }
+        }
 
-        // If the found resource isn't a Patient (when no criteria for Patients),
-        // replace it with a Patient
-        if (otherResources.length) {
-          return this.http
-            .get<Bundle>(`$fhir/${PATIENT_RESOURCE_TYPE}`, {
-              params: {
-                _id: otherResources
-                  .map((resource) => this.getPatientIdFromResource(resource))
-                  .join(','),
-                _count: otherResources.length
-              }
-            })
-            .pipe(
-              map((response) => {
-                if (!response?.entry?.length) {
-                  return [];
-                }
-                return patients.concat(response.entry.map((entry) => entry.resource));
-              })
-            );
-        } else {
+        // If there are no related resources, return the patients as-is.
+        if (!otherPatientIds.length) {
           return of(patients);
         }
+
+        // Fetch Patient resources for related resources so the caller always
+        // receives Patient objects.
+        return this.http
+          .get<Bundle>(`$fhir/${PATIENT_RESOURCE_TYPE}`, {
+            params: {
+              _id: otherPatientIds.join(','),
+              _count: otherPatientIds.length
+            }
+          })
+          .pipe(
+            map((response) =>
+              response?.entry?.length
+                ? patients.concat(response.entry.map((entry) => entry.resource as Patient))
+                : []
+            )
+          );
       }),
       map((patients: Patient[]) => {
         const processedResources = patients.length;
@@ -346,38 +350,33 @@ export class CohortService {
               currentState
             ).pipe(
               mergeMap((resources: Resource[]) => {
-                // Exclude processed and duplicate resources
-                const uncheckedResources = (uniqBy(resources, this.getPatientIdFromResource) as Resource[])
-                  .filter((resource) => !currentState.processedPatientIds[this.getPatientIdFromResource(resource)])
-                  .map((resource) => ({
-                    resource,
-                    checkPassed: true
-                  }));
+                // Deduplicate by Patient ID and skip already-processed patients.
+                const uncheckedResources = uniqBy(
+                  resources.filter((r) => {
+                    const patientId = this.getPatientIdFromResource(r);
+                    return patientId && !currentState.processedPatientIds[patientId];
+                  }),
+                  (r) => this.getPatientIdFromResource(r)
+                ).map((resource) => ({ resource, checkPassed: true }));
 
                 // Run a parallel check of the accumulated resources by the rest
                 // of the criteria:
-                return (uncheckedResources.length
-                    ? this.check(uncheckedResources, {
-                      ...newCriteria,
-                      rules: restRules
-                    }).pipe(
-                      map((res) =>
-                        res.reduce((acc, {resource, checkPassed}) => {
-                          if (checkPassed) {
-                            acc.push(resource);
-                          }
-                          return acc;
-                        }, [])
-                      )
+                const checked$: Observable<Resource[]> = uncheckedResources.length
+                  ? this.check(uncheckedResources, { ...newCriteria, rules: restRules }).pipe(
+                    map((res) =>
+                      res
+                        .filter(({ checkPassed }) => checkPassed)
+                        .map(({ resource }) => resource)
                     )
-                    : of([])
-                ).pipe(
-                  map((r: Resource[]) => {
-                    const checkedResources = r.filter((resource) => !!resource);
+                  )
+                  : of([]);
+
+                return checked$.pipe(
+                  map((checkedResources) => {
                     // Update the number of resources in processing
                     currentState.numberOfProcessingResources$.next(
                       currentState.numberOfProcessingResources$.value -
-                        (resources.length - checkedResources.length)
+                      (resources.length - checkedResources.length)
                     );
                     return checkedResources;
                   })
@@ -447,62 +446,77 @@ export class CohortService {
               // If the resource is not a Patient, we extract only the subject
               // element in order to further identify the Patient by it.
               const elements =
-                (resourceType === RESEARCH_STUDY_RESOURCE_TYPE &&
-                  '&_elements=id') ||
-                (resourceType !== PATIENT_RESOURCE_TYPE && '&_elements=subject') ||
-                '';
+                resourceType === RESEARCH_STUDY_RESOURCE_TYPE
+                  ? '&_elements=id'
+                  : resourceType !== PATIENT_RESOURCE_TYPE
+                    ? '&_elements=subject'
+                    : '';
+
+              // Partition the resources to check by whether they have a Patient ID.
+              const validResourcesToCheck: ResourceToCheck[] = [];
+              const invalidResourcesToCheck: ResourceToCheck[] = [];
+              for (const r of toCheck) {
+                if (this.getPatientIdFromResource(r.resource)) {
+                  validResourcesToCheck.push(r);
+                } else {
+                  invalidResourcesToCheck.push({ ...r, checkPassed: false });
+                }
+              }
+
+              const baseTail = alreadyChecked.concat(invalidResourcesToCheck);
+              if (!validResourcesToCheck.length) {
+                return of(baseTail);
+              }
+
+              const doRequest = (link: string) =>
+                this.requestResourcesForCheck(
+                  resourceType, link, elements, criteria.resourceType, rules, useHas
+                );
+
+              let batches$: Observable<ResourceToCheck[]>[];
 
               if (resourceType === PATIENT_RESOURCE_TYPE) {
-                const numberOfPatientsInRequest = 10;
-                return forkJoin(chunk(
-                    toCheck,
-                    numberOfPatientsInRequest
-                  ).map((curResourcesToCheck) => {
-                    const link = '_id=' + curResourcesToCheck.map(({resource}) => this.getPatientIdFromResource(resource));
-
-                    return this.requestResourcesForCheck(resourceType, link, elements, criteria.resourceType, rules, useHas).pipe(
-                      map((response) => {
-                        const responseResources = new Map(response?.entry?.map(({resource}) => [resource.id, resource]));
-                        return curResourcesToCheck.map(item => {
-                          const patientId = this.getPatientIdFromResource(item.resource);
-                          // If in the set of loaded patients that meet the criteria,
-                          // there is a patient with the same identifier as the resource
-                          // being checked, then we replace this resource with the patient
-                          // so that at the end of the search we do not have to make
-                          // an additional request for the patient by identifier.
-                          if (responseResources.has(patientId)) {
-                            item = {
-                              resource: responseResources.get(patientId),
-                              checkPassed: true
-                            };
-                          } else {
-                            item.checkPassed = false;
-                          }
-                          return item;
-                        });
-                      })
-                    );
-                  })
-                ).pipe(
-                  map((res) => alreadyChecked.concat(...res))
-                );
-              } else {
-                return forkJoin(toCheck.map(resourceToCheck => {
-                  const patientId = this.getPatientIdFromResource(resourceToCheck.resource);
-                  const link =
-                    (resourceType === RESEARCH_STUDY_RESOURCE_TYPE &&
-                      `_count=1&_has:ResearchSubject:study:${this.fhirBackend.subjectParamName}=Patient/${patientId}`) ||
-                    `_count=1&subject=Patient/${patientId}`;
-                  return this.requestResourcesForCheck(resourceType, link, elements, criteria.resourceType, rules, useHas).pipe(
+                // Check up to 10 patients per request using _id=.
+                batches$ = chunk(validResourcesToCheck, 10).map((batch) => {
+                  const patientIds = batch.map(
+                    ({ resource }) => this.getPatientIdFromResource(resource)!
+                  );
+                  return doRequest('_id=' + patientIds.join(',')).pipe(
                     map((response) => {
-                      resourceToCheck.checkPassed = !!response?.entry?.length;
-                      return resourceToCheck;
+                      const found = new Map(
+                        response?.entry?.map(({ resource }) => [resource.id, resource])
+                      );
+                      return batch.map((item) => {
+                        const patientId = this.getPatientIdFromResource(item.resource);
+                        // If the patient was returned, replace the resource with it so we
+                        // don't need a follow-up request to fetch the Patient later.
+                        return found.has(patientId)
+                          ? { resource: found.get(patientId), checkPassed: true }
+                          : { ...item, checkPassed: false };
+                      });
                     })
                   );
-                })).pipe(
-                  map((res) => alreadyChecked.concat(res))
-                );
+                });
+              } else {
+                // Check one resource at a time using subject= (or _has for ResearchStudy).
+                batches$ = validResourcesToCheck.map((item) => {
+                  const patientId = this.getPatientIdFromResource(item.resource)!;
+                  const link =
+                    resourceType === RESEARCH_STUDY_RESOURCE_TYPE
+                      ? `_count=1&_has:ResearchSubject:study:${this.fhirBackend.subjectParamName}=Patient/${patientId}`
+                      : `_count=1&subject=Patient/${patientId}`;
+                  return doRequest(link).pipe(
+                    map((response) => {
+                      item.checkPassed = !!response?.entry?.length;
+                      return [item];
+                    })
+                  );
+                });
               }
+
+              return forkJoin(batches$).pipe(
+                map((results) => baseTail.concat(...results))
+              );
             } else {
               return of(alreadyChecked);
             }
@@ -1005,12 +1019,12 @@ export class CohortService {
    * Extracts the Patient ID from a patient-related resource or from a Patient
    * resource.
    */
-  getPatientIdFromResource(resource: Resource): string {
+  getPatientIdFromResource(resource: Resource): string | undefined {
     return resource.resourceType === PATIENT_RESOURCE_TYPE
       ? resource.id
       // TODO: In the future we might want to use the resolve() function from
       //  fhirpath.js instead of RegExp.
-      : ((resource as any).subject?.reference).match(/(^|\/)Patient\/(.*)/)?.[2];
+      : (resource as any).subject?.reference?.match(/(^|\/)Patient\/(.*)/)?.[2];
   }
 
   /**

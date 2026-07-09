@@ -13,7 +13,7 @@ import {
   PRIORITIES as FhirBatchQueryPriorities,
   UNSUPPORTED_VERSION
 } from './fhir-batch-query.js';
-import definitionsIndex from '../definitions/index.json';
+import definitionsIndex from '../definitions/generated-index.json';
 import { FhirServerFeatures } from '../../types/fhir-server-features';
 import { escapeStringForRegExp, getUrlParam, setUrlParam } from '../utils';
 import { SettingsService } from '../settings-service/settings.service';
@@ -127,7 +127,6 @@ export class FhirBackendService implements HttpBackend {
   isPreviousVersion = getUrlParam('prev-version') === 'enable';
 
   // Checkbox value of whether to use a SMART on FHIR client.
-  // tslint:disable-next-line:variable-name
   private _isSmartOnFhir = false;
   set isSmartOnFhir(value: boolean) {
     if (value) {

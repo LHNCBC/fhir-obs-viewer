@@ -15,13 +15,18 @@
       "prefix": "app",
       "architect": {
         "build": {
-          "builder": "@angular-builders/custom-webpack:browser",
+          "builder": "@angular/build:application",
           "options": {
             "baseHref": "/fhir/research-data-finder/",
-            "outputPath": "public",
+            "outputPath": {
+              "base": "public",
+              "browser": ""
+            },
             "index": "src/index.html",
-            "main": "src/main.ts",
-            "polyfills": "src/polyfills.ts",
+            "browser": "src/main.ts",
+            "polyfills": [
+              "src/polyfills.ts"
+            ],
             "tsConfig": "tsconfig.app.json",
             "aot": true,
             "optimization": false,
@@ -50,13 +55,7 @@
             ],
             "scripts": [
               "./node_modules/jquery/dist/jquery.min.js"
-            ],
-            "customWebpackConfig": {
-              "path": "./webpack/extra-webpack.config.js",
-              "mergeRules": {
-                "externals": "replace"
-              }
-            }
+            ]
           },
           "configurations": {
             "production": {
@@ -70,8 +69,6 @@
               "outputHashing": "all",
               "namedChunks": false,
               "extractLicenses": true,
-              "vendorChunk": false,
-              "buildOptimizer": true,
               "budgets": [
                 {
                   "type": "initial",
@@ -84,11 +81,27 @@
                   "maximumError": "10kb"
                 }
               ]
+            },
+            "unit-test": {
+              "aot": false,
+              "polyfills": [
+                "zone.js"
+              ],
+              "assets": [
+                "src/favicon.ico",
+                "src/assets",
+                "src/conf/settings.json5",
+                "src/conf/csv"
+              ],
+              "styles": [
+                "./node_modules/@angular/material/prebuilt-themes/indigo-pink.css",
+                "src/styles.less"
+              ]
             }
           }
         },
         "serve": {
-          "builder": "@angular-builders/custom-webpack:dev-server",
+          "builder": "@angular/build:dev-server",
           "options": {
             "buildTarget": "fhir-obs-viewer:build",
             "port": 8100,
@@ -101,37 +114,25 @@
           }
         },
         "extract-i18n": {
-          "builder": "@angular-builders/custom-webpack:extract-i18n",
+          "builder": "@angular/build:extract-i18n",
           "options": {
             "buildTarget": "fhir-obs-viewer:build"
           }
         },
         "test": {
-          "builder": "@angular-builders/custom-webpack:karma",
+          "builder": "@angular/build:unit-test",
           "options": {
-            "main": "src/test.ts",
-            "polyfills": "src/polyfills.ts",
-            "tsConfig": "src/tsconfig.spec.json",
-            "karmaConfig": "karma.conf.js",
-            "assets": [
-              "src/favicon.ico",
-              "src/assets",
-              "src/conf/settings.json5",
-              "src/conf/csv"
+            "buildTarget": "fhir-obs-viewer:build:unit-test",
+            "runner": "vitest",
+            "runnerConfig": "vitest-base.config.ts",
+            "tsConfig": "src/tsconfig.json",
+            "include": [
+              "**/*.spec.ts",
+              "**/*.spec.js"
             ],
-            "styles": [
-              "./node_modules/@angular/material/prebuilt-themes/indigo-pink.css",
-              "src/styles.less"
-            ],
-            "scripts": [
-              "./node_modules/jquery/dist/jquery.min.js"
-            ],
-            "customWebpackConfig": {
-              "path": "./webpack/extra-webpack.config.js",
-              "mergeRules": {
-                "externals": "replace"
-              }
-            }
+            "setupFiles": [
+              "src/test.ts"
+            ]
           }
         },
         "cypress-e2e": {
@@ -151,12 +152,25 @@
           "options": {
             "watch": true
           }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "src/**/*.ts",
+              "src/**/*.html",
+              "test/**/*.ts"
+            ]
+          }
         }
       }
     }
   },
   "cli": {
-    "analytics": false
+    "analytics": false,
+    "schematicCollections": [
+      "angular-eslint"
+    ]
   },
   "schematics": {
     "@schematics/angular:component": {

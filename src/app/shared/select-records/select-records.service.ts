@@ -391,8 +391,8 @@ export class SelectRecordsService {
     this.preloadState[resourceType]?.preloadSubscription.unsubscribe();
     delete this.preloadState[resourceType];
 
-    const subjects$ = selectedResearchStudies?.length
-      ? this.http.get('$fhir/ResearchSubject', {
+    const subjects$: Observable<Bundle | null> = selectedResearchStudies?.length
+      ? this.http.get<Bundle>('$fhir/ResearchSubject', {
         params: {
           _elements: this.fhirBackend.subjectParamName,
           study: selectedResearchStudies.map((s) => 'ResearchStudy/' + s.id).join(',')

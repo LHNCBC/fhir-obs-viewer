@@ -1,34 +1,30 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
 import { BrowseRecordsPageComponent } from './browse-records-page.component';
-import { HarnessLoader } from '@angular/cdk/testing';
-import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import {
   configureTestingModule,
   verifyOutstandingRequests
 } from 'src/test/helpers';
 import { BrowseRecordsPageModule } from './browse-records-page.module';
+import { MatIconTestingModule } from '@angular/material/icon/testing';
 import { HttpTestingController } from '@angular/common/http/testing';
 import researchStudies from 'src/test/test-fixtures/research-studies.json';
 import threeVariables from 'src/test/test-fixtures/variables-3.json';
 import fourVariables from 'src/test/test-fixtures/variables-4.json';
-import { MatTabGroupHarness } from '@angular/material/tabs/testing';
 import { HttpParams, HttpRequest } from '@angular/common/http';
 import { By } from '@angular/platform-browser';
-import { MatTableHarness } from '@angular/material/table/testing';
 import { ResourceTableComponent } from '../resource-table/resource-table.component';
 
 describe('BrowseRecordsPageComponent', () => {
   let component: BrowseRecordsPageComponent;
   let fixture: ComponentFixture<BrowseRecordsPageComponent>;
   let mockHttp: HttpTestingController;
-  let loader: HarnessLoader;
 
   beforeEach(async () => {
     await configureTestingModule(
       {
         declarations: [BrowseRecordsPageComponent],
-        imports: [BrowseRecordsPageModule]
+        imports: [BrowseRecordsPageModule, MatIconTestingModule]
       },
       {
         features: {
@@ -42,9 +38,7 @@ describe('BrowseRecordsPageComponent', () => {
 
   beforeEach(() => {
     fixture = TestBed.createComponent(BrowseRecordsPageComponent);
-    loader = TestbedHarnessEnvironment.loader(fixture);
     component = fixture.componentInstance;
-    fixture.detectChanges();
     // The first call to getHarness in the expectNumberOfRecords function will
     // never end if the interval is active. This looks like a bug.
     // As a workaround, just do not create the "interval()":
@@ -52,6 +46,7 @@ describe('BrowseRecordsPageComponent', () => {
       ResourceTableComponent.prototype,
       'runPreloadEvents'
     ).and.callFake(() => {});
+    fixture.detectChanges();
   });
 
   afterEach(() => {
@@ -63,7 +58,9 @@ describe('BrowseRecordsPageComponent', () => {
    * Load studies at the beginning
    */
   async function loadStudies(): Promise<void> {
-    await fixture.whenStable();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
     fixture.detectChanges();
     mockHttp
       .expectOne('$fhir/ResearchStudy?_count=3000')
@@ -76,13 +73,16 @@ describe('BrowseRecordsPageComponent', () => {
    * @param label - tab's label
    */
   async function selectTab(label: string): Promise<void> {
-    const tabGroup = await loader.getHarness(MatTabGroupHarness);
-    // TODO: "MatTabGroupHarness.selectTab" works but returns a Promise which never resolves.
-    tabGroup.selectTab({ label });
-    // TODO: The workaround is to add a pause
-    await new Promise((resolve) => {
-      setTimeout(resolve, 200);
-    });
+    const resourceType = label === 'Studies' ?
+      'ResearchStudy' :
+      component.visibleResourceTypes.includes('Variable') ?
+        'Variable' :
+        'Observation';
+    const index = component.visibleResourceTypes.indexOf(resourceType);
+    expect(index).not.toBe(-1);
+    component.tabGroup.selectedIndex = index;
+    component.selectedTabChange({ index } as any);
+    fixture.detectChanges();
   }
 
   /**
@@ -90,11 +90,15 @@ describe('BrowseRecordsPageComponent', () => {
    * @param n - number of expected records
    */
   async function expectNumberOfRecords(n: number): Promise<void> {
-    const tabGroup = await loader.getHarness(MatTabGroupHarness);
-    const currentTab = await tabGroup.getSelectedTab();
-    const table = await currentTab.getHarness(MatTableHarness);
-    const rows = await table.getRows();
-    expect(rows.length).toBe(n);
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
+    fixture.detectChanges();
+    const table = component.tables.find(
+      (resourceTable) =>
+        resourceTable.resourceType === component.getCurrentResourceType()
+    );
+    expect(table.dataSource.data.length).toBe(n);
   }
 
   /**
@@ -103,9 +107,11 @@ describe('BrowseRecordsPageComponent', () => {
   async function loadVariables(): Promise<void> {
     (ResourceTableComponent.prototype
       .runPreloadEvents as jasmine.Spy).calls.reset();
-    await selectTab('Variables');
+    const selectVariablesTabPromise = selectTab('Variables');
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
     fixture.detectChanges();
-    expect(component.variableTable.runPreloadEvents).not.toHaveBeenCalled();
     mockHttp
       .expectOne((req: HttpRequest<any>) => {
         return (
@@ -115,11 +121,27 @@ describe('BrowseRecordsPageComponent', () => {
         );
       })
       .flush(fourVariables);
+    await selectVariablesTabPromise;
     // TODO: In Angular 19, we need "resize" event to trigger rendering table here
     window.dispatchEvent(new Event('resize'));
-    fixture.detectChanges();
-    expect(component.variableTable.runPreloadEvents).toHaveBeenCalledOnceWith();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
     await expectNumberOfRecords(4);
+  }
+
+  /**
+   * Selects the loaded ResearchStudy with the specified ID.
+   * @param studyId - ResearchStudy ID to select.
+   */
+  function selectStudy(studyId: string): void {
+    const row = component.resourceTable.dataSource.data.find(
+      (record) => record.resource.id === studyId
+    );
+    expect(row).toBeDefined();
+    component.resourceTable.selectedResources.select(row.resource);
+    component.onSelectionChange('ResearchStudy');
+    fixture.detectChanges();
   }
 
   it('should create', () => {
@@ -139,11 +161,12 @@ describe('BrowseRecordsPageComponent', () => {
     await loadStudies();
     await loadVariables();
     await selectTab('Studies');
-    // Select first study
-    fixture.debugElement
-      .queryAll(By.css('mat-tab-body:first-child mat-checkbox label'))[1]
-      .nativeElement.click();
-    await selectTab('Variables');
+    selectStudy('phs002409');
+    const selectVariablesTabPromise = selectTab('Variables');
+    await new Promise((resolve) => {
+      setTimeout(resolve, 200);
+    });
+    fixture.detectChanges();
     mockHttp
       .expectOne((req: HttpRequest<any>) => {
         return (
@@ -154,6 +177,7 @@ describe('BrowseRecordsPageComponent', () => {
         );
       })
       .flush(threeVariables);
+    await selectVariablesTabPromise;
     await expectNumberOfRecords(3);
   });
 

@@ -6,7 +6,6 @@ import { MatAutocompleteTrigger } from '@angular/material/autocomplete';
  * an item and move focus to the next control.
  */
 @Directive({
-  // tslint:disable-next-line:directive-selector
   selector: '[tabToSelect]',
   standalone: false
 })

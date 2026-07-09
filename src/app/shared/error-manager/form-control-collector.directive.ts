@@ -7,7 +7,6 @@ import { ErrorManager } from './error-manager.service';
  * into the ErrorManager service.
  */
 @Directive({
-  // tslint:disable-next-line:directive-selector
   selector: '[formControl],[formControlName],[ngModel]',
   standalone: false
 })

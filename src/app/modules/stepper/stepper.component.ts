@@ -33,7 +33,7 @@ import {
   CreateCohortMode
 } from '../../shared/cohort/cohort.service';
 import { PullDataService } from '../../shared/pull-data/pull-data.service';
-import pkg from '../../../../package.json';
+import { APP_VERSION } from '../../shared/app-version';
 import { findLast } from 'lodash-es';
 import { getUrlParam } from '../../shared/utils';
 import {
@@ -57,20 +57,11 @@ import {
 } from '../../shared/alert-dialog/alert-dialog.component';
 import { Patient } from 'fhir/r4';
 
-// Ordered list of steps (should be the same as in the template)
-// The main purpose of this is to determine the name of the previous or next
-// visible step before the template is rendered so that the
-// "NG0100: ExpressionChangedAfterItHasBeenCheckedError" error does not occur.
-export enum Step {
-  SETTINGS,
-  SELECT_AN_ACTION,
-  SELECT_RESEARCH_STUDIES,
-  SELECT_RECORDS,
-  BROWSE_PUBLIC_DATA,
-  DEFINE_COHORT,
-  VIEW_COHORT,
-  PULL_DATA_FOR_THE_COHORT
-}
+// The Step enum has been moved to ./step.enum.ts to avoid circular module
+// dependencies. It is re-exported here so existing imports of
+// `Step` from `stepper.component` continue to work.
+import { Step } from './step.enum';
+export { Step };
 
 /**
  * The main component provides a wizard-like workflow by dividing content into logical steps.
@@ -442,7 +433,7 @@ export class StepperComponent implements OnInit, AfterViewInit, OnDestroy {
   getSavedObject(): any {
     const scrubberID = this.fhirBackend.fhirClient.getScrubberIDHeader();
     const result: any = {
-      version: pkg.version,
+      version: APP_VERSION,
       ...(scrubberID ? {scrubberID} : {}),
       serviceBaseUrl: this.fhirBackend.serviceBaseUrl,
       isCartCriteria: !!this.selectRecordsComponent,

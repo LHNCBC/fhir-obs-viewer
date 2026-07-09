@@ -3,7 +3,6 @@ import {
   Component,
   ElementRef,
   HostListener,
-  OnDestroy,
   ViewChild
 } from '@angular/core';
 import Def from 'autocomplete-lhc';
@@ -19,7 +18,7 @@ import { CustomDialogRef } from '../../shared/custom-dialog/custom-dialog-ref';
   styleUrls: ['./resource-table-filter.component.less'],
   standalone: false
 })
-export class ResourceTableFilterComponent implements AfterViewInit, OnDestroy {
+export class ResourceTableFilterComponent implements AfterViewInit {
   static idPrefix = 'resource-table-filter-';
   static idIndex = 0;
   inputId =
@@ -31,7 +30,6 @@ export class ResourceTableFilterComponent implements AfterViewInit, OnDestroy {
   options: string[] = [];
   // Autocompleter instance
   acInstance: Def.Autocompleter.Prefetch;
-  searchResultsElm: HTMLElement;
 
   readonly INSTRUCTIONS = [
     'Filter by text',
@@ -71,14 +69,6 @@ export class ResourceTableFilterComponent implements AfterViewInit, OnDestroy {
       this.input.nativeElement.value = this.value as string;
     }
     this.dialogRef.overlay.backdropClick().subscribe(() => this.close());
-  }
-
-  ngOnDestroy(): void {
-    if (this.searchResultsElm) {
-      // Set position property back so it works properly in other autocomplete instances that
-      // aren't built on a modal, e.g. in search criteria inputs.
-      this.searchResultsElm.style.position = 'absolute';
-    }
   }
 
   @HostListener('document:keydown.escape', ['$event'])
