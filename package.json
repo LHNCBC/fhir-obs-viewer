@@ -1,6 +1,6 @@
 {
   "name": "fhir-obs-viewer",
-  "version": "7.9.5",
+  "version": "7.9.6",
   "scripts": {
     "ng": "ng",
     "sync-generated-assets": "node bin/sync-generated-assets.js",
