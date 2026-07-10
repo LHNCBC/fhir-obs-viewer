@@ -3,6 +3,11 @@
 This log documents the significant changes for each release.
 This project follows [Semantic Versioning](http://semver.org/).
 
+## [7.9.6] - 2026-07-10
+### Fixed
+- Fixed the sticky Cart list header being overlapped by record remove buttons
+  when scrolling through a long list of cart items.
+
 ## [7.9.5] - 2026-06-02
 ### Changed
 - Replaced TSLint with Angular ESLint, added linting to the full `npm test`

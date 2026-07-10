@@ -137,7 +137,12 @@
   position: sticky;
   top: 0;
   background: #fff;
-  z-index: 1;
+  // Must stay above the mini-fab buttons in the list body: Angular Material
+  // sets z-index: 1 on the icon inside each FAB, and because the button does
+  // not create its own stacking context, that icon competes with this sticky
+  // header in the same stacking context. Use a higher value so the header
+  // always paints on top of scrolled-under rows.
+  z-index: 100;
   min-width: 100%;
   width: fit-content;
   margin-left: -8px;
